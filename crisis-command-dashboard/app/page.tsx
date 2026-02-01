@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react"
 import IncidentDetailView from "@/components/incident-detail-view"
 import RightSidebar from "@/components/right-sidebar"
+import { incidentsAPI, personnelAPI } from "@/lib/api"
+import { useWebSocket } from "@/hooks/use-websocket"
 
 // Dynamic import for Leaflet map to avoid SSR issues
 const MapComponent = dynamic(() => import("@/components/map-component"), {
@@ -104,9 +106,132 @@ const mockPersonnel = [
 ]
 
 export default function CrisisCommandDashboard() {
-  const [selectedIncident, setSelectedIncident] = useState<(typeof mockIncidents)[0] | null>(mockIncidents[0])
-  const [incidents, setIncidents] = useState(mockIncidents)
-  const [expandedIncident, setExpandedIncident] = useState<number | null>(mockIncidents[0].id)
+  const [selectedIncident, setSelectedIncident] = useState<any | null>(null)
+  const [incidents, setIncidents] = useState<any[]>([])
+  const [personnel, setPersonnel] = useState<any[]>([])
+  const [expandedIncident, setExpandedIncident] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // WebSocket connection
+  const { isConnected, on, off, joinIncident, leaveIncident } = useWebSocket({
+    autoConnect: true,
+    onConnect: () => console.log('Dashboard connected to WebSocket'),
+  })
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+
+        // Fetch incidents
+        const incidentsResponse = await incidentsAPI.getAll()
+        if (incidentsResponse.success) {
+          const formattedIncidents = incidentsResponse.incidents.map((inc: any) => ({
+            ...inc,
+            location: { lat: inc.lat, lng: inc.lng },
+            time: new Date(inc.created_at).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            reportSource: inc.report_source || 'web',
+            responders: inc.responders?.map((r: any) => r.name) || [],
+            resources: inc.resources?.map((r: any) => r.name) || [],
+            arrivedUnits: inc.responders?.filter((r: any) => r.status === 'on-scene').length || 0,
+            totalUnits: (inc.responders?.length || 0) + (inc.resources?.length || 0),
+          }))
+          setIncidents(formattedIncidents)
+
+          if (formattedIncidents.length > 0) {
+            setSelectedIncident(formattedIncidents[0])
+            setExpandedIncident(formattedIncidents[0].id)
+          }
+        }
+
+        // Fetch personnel
+        const personnelResponse = await personnelAPI.getAll()
+        if (personnelResponse.success) {
+          const formattedPersonnel = personnelResponse.personnel.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            location: { lat: p.lat, lng: p.lng },
+            status: p.status,
+            assignedIncident: p.assigned_incident_id,
+            role: p.role,
+          }))
+          setPersonnel(formattedPersonnel)
+        }
+
+        setLoading(false)
+      } catch (error) {
+        console.error('Error fetching data:', error)
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // WebSocket event handlers
+  useEffect(() => {
+    if (!isConnected) return
+
+    // Listen for incident updates
+    const handleIncidentUpdate = (data: any) => {
+      console.log('Incident updated:', data)
+      setIncidents(prev =>
+        prev.map(inc =>
+          inc.id === data.incident_id
+            ? { ...inc, ...data.data }
+            : inc
+        )
+      )
+    }
+
+    // Listen for personnel location updates
+    const handlePersonnelLocationUpdate = (data: any) => {
+      console.log('Personnel location updated:', data)
+      setPersonnel(prev =>
+        prev.map(p =>
+          p.id === data.personnel_id
+            ? { ...p, location: data.location, status: data.status }
+            : p
+        )
+      )
+    }
+
+    // Listen for personnel status updates
+    const handlePersonnelStatusUpdate = (data: any) => {
+      console.log('Personnel status updated:', data)
+      setPersonnel(prev =>
+        prev.map(p =>
+          p.id === data.personnel_id
+            ? { ...p, status: data.status }
+            : p
+        )
+      )
+    }
+
+    on('incident_updated', handleIncidentUpdate)
+    on('personnel_location_updated', handlePersonnelLocationUpdate)
+    on('personnel_status_updated', handlePersonnelStatusUpdate)
+
+    return () => {
+      off('incident_updated', handleIncidentUpdate)
+      off('personnel_location_updated', handlePersonnelLocationUpdate)
+      off('personnel_status_updated', handlePersonnelStatusUpdate)
+    }
+  }, [isConnected, on, off])
+
+  // Join incident room when selected
+  useEffect(() => {
+    if (selectedIncident && isConnected) {
+      joinIncident(selectedIncident.id)
+      return () => {
+        leaveIncident(selectedIncident.id)
+      }
+    }
+  }, [selectedIncident, isConnected, joinIncident, leaveIncident])
 
   const handleSelectIncident = (incident: (typeof mockIncidents)[0]) => {
     setSelectedIncident(incident)
@@ -151,8 +276,8 @@ export default function CrisisCommandDashboard() {
                 <button
                   onClick={() => handleSelectIncident(incident)}
                   className={`w-full text-left p-3 rounded-lg transition-all ${selectedIncident?.id === incident.id
-                      ? "bg-accent/20 border border-accent"
-                      : "bg-muted/30 border border-transparent hover:bg-muted/50"
+                    ? "bg-accent/20 border border-accent"
+                    : "bg-muted/30 border border-transparent hover:bg-muted/50"
                     }`}
                 >
                   <div className="flex items-start justify-between mb-2">
@@ -160,12 +285,12 @@ export default function CrisisCommandDashboard() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span
                         className={`text-xs px-2 py-1 rounded ${incident.severity === "critical"
-                            ? "bg-primary/20 text-primary"
-                            : incident.severity === "high"
-                              ? "bg-orange-500/20 text-orange-600 dark:text-orange-400"
-                              : incident.severity === "medium"
-                                ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
-                                : "bg-green-500/20 text-green-600 dark:text-green-400"
+                          ? "bg-primary/20 text-primary"
+                          : incident.severity === "high"
+                            ? "bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                            : incident.severity === "medium"
+                              ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400"
+                              : "bg-green-500/20 text-green-600 dark:text-green-400"
                           }`}
                       >
                         {incident.severity.toUpperCase()}
@@ -232,7 +357,13 @@ export default function CrisisCommandDashboard() {
         {/* Map */}
         <div className="flex-1 overflow-hidden p-4">
           <div className="w-full h-full rounded-lg overflow-hidden border border-border bg-muted">
-            <MapComponent incidents={incidents} selectedIncident={selectedIncident} personnel={mockPersonnel} />
+            {loading ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-muted-foreground">Loading map data...</div>
+              </div>
+            ) : (
+              <MapComponent incidents={incidents} selectedIncident={selectedIncident} personnel={personnel} />
+            )}
           </div>
         </div>
       </div>
