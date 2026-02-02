@@ -10,6 +10,7 @@ export default function CommsView() {
     const [loading, setLoading] = useState(false)
     const [pendingMessage, setPendingMessage] = useState("")
     const [isSending, setIsSending] = useState(false)
+    const [currentUser, setCurrentUser] = useState<any>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     const { on, off, emit, isConnected } = useWebSocket({
@@ -19,12 +20,23 @@ export default function CommsView() {
         },
     })
 
+    // Load current user from localStorage
+    useEffect(() => {
+        const userStr = localStorage.getItem('currentUser')
+        if (userStr) {
+            const user = JSON.parse(userStr)
+            setCurrentUser(user)
+            console.log('Current user:', user)
+        }
+    }, [])
+
     useEffect(() => {
         // Show welcome message
         setMessages([
             {
                 id: 'welcome',
-                sender: 'System',
+                sender_id: null,
+                sender_name: 'System',
                 message: 'Team communication channel active. All responders will receive your messages.',
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 type: 'system',
@@ -34,7 +46,7 @@ export default function CommsView() {
     }, [])
 
     useEffect(() => {
-        if (!isConnected) return
+        if (!isConnected || !currentUser) return
 
         const handleBroadcastMessage = (data: any) => {
             console.log("Broadcast message received:", data)
@@ -49,10 +61,11 @@ export default function CommsView() {
 
                 const newMsg = {
                     id: data.comm_id,
-                    sender: data.sender_name,
+                    sender_id: data.sender_id,
+                    sender_name: data.sender_name,
                     message: data.message,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    type: data.sender_id === 1 ? 'sent' : 'received',
+                    type: data.sender_id === currentUser.id ? 'sent' : 'received',
                     status: 'delivered'
                 }
                 return [...prev, newMsg]
@@ -66,7 +79,7 @@ export default function CommsView() {
         return () => {
             off('broadcast_received', handleBroadcastMessage)
         }
-    }, [isConnected, on, off]) // Now safe to include since they're memoized
+    }, [isConnected, on, off, currentUser])
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -75,7 +88,7 @@ export default function CommsView() {
     }, [messages])
 
     const handleSendMessage = async () => {
-        if (!pendingMessage.trim() || isSending) return
+        if (!pendingMessage.trim() || isSending || !currentUser) return
 
         try {
             setIsSending(true)
@@ -83,8 +96,8 @@ export default function CommsView() {
             // Send broadcast message via WebSocket
             emit('broadcast_message', {
                 message: pendingMessage,
-                sender_name: 'Responder',
-                sender_id: 1, // Mock ID
+                sender_name: currentUser.name,
+                sender_id: currentUser.id,
                 timestamp: new Date().toISOString()
             })
 
@@ -141,9 +154,14 @@ export default function CommsView() {
                                 msg.type === "sent" && "items-end"
                             )}>
                                 {/* Sender Name */}
-                                {msg.type !== "sent" && (
+                                {msg.type !== "sent" && msg.type !== "system" && (
                                     <div className="text-xs font-medium text-muted-foreground px-3">
-                                        {msg.sender}
+                                        {msg.sender_name} {msg.sender_id && `(ID: ${msg.sender_id})`}
+                                    </div>
+                                )}
+                                {msg.type === "sent" && (
+                                    <div className="text-xs font-medium text-muted-foreground px-3 text-right">
+                                        You {msg.sender_id && `(ID: ${msg.sender_id})`}
                                     </div>
                                 )}
 
