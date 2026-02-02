@@ -7,21 +7,23 @@ interface MissionBriefingProps {
   onToggle: () => void
   checklist: Record<string, boolean>
   onChecklistToggle: (item: string) => void
+  incident?: any
 }
 
-export default function MissionBriefing({ isExpanded, onToggle, checklist, onChecklistToggle }: MissionBriefingProps) {
-  // Example data for demonstration
-  const incident = {
-    type: "Structural Fire",
-    block: "Block 4",
-    reportedBy: "Officer James Mitchell",
-    callerRole: "Security Guard",
-    callerPhone: "+91 98765 43210",
-    timestamp: "2026-01-14 14:32",
-    address: "Block 4, Connaught Place, Delhi",
-    victims: 2,
-    severity: "High - Active Fire",
-    notes: "Heavy smoke visible from the 2nd floor. Possible gas cylinder leak reported by caller. Evacuation in progress."
+export default function MissionBriefing({ isExpanded, onToggle, checklist, onChecklistToggle, incident }: MissionBriefingProps) {
+  if (!incident) return null
+
+  const formattedIncident = {
+    type: incident.type?.charAt(0).toUpperCase() + incident.type?.slice(1) || "Emergency",
+    block: incident.location_name || "Active Zone",
+    reportedBy: incident.reporter_name || "System Alert",
+    callerRole: "Reporter",
+    callerPhone: incident.contact_phone || "Not available",
+    timestamp: new Date(incident.created_at).toLocaleString(),
+    address: incident.location_name || `${incident.lat?.toFixed(4)}, ${incident.lng?.toFixed(4)}`,
+    victims: incident.victims_count || 0,
+    severity: incident.severity?.toUpperCase() || "HIGH",
+    notes: incident.description || "No additional notes provided."
   }
 
   return (
@@ -43,8 +45,8 @@ export default function MissionBriefing({ isExpanded, onToggle, checklist, onChe
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-base text-gray-900 dark:text-white truncate">{incident.type} - {incident.block}</h2>
-            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Reported by: {incident.reportedBy} ({incident.callerRole})</p>
+            <h2 className="font-bold text-base text-gray-900 dark:text-white truncate">{formattedIncident.type} - {formattedIncident.block}</h2>
+            <p className="text-xs text-gray-600 dark:text-gray-400 truncate">Reported by: {formattedIncident.reportedBy}</p>
           </div>
           <button className="p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full transition-colors flex-shrink-0 ml-2">
             <ChevronUp className={`w-5 h-5 text-gray-700 dark:text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
@@ -55,7 +57,7 @@ export default function MissionBriefing({ isExpanded, onToggle, checklist, onChe
         <div className="px-4 py-3 space-y-2">
           {/* Address */}
           <div className="text-xs text-gray-700 dark:text-gray-300 truncate">
-            <span className="font-semibold">📍 </span>{incident.address}
+            <span className="font-semibold">📍 </span>{formattedIncident.address}
           </div>
 
           {/* Victims and Severity - Side by side */}
@@ -65,7 +67,7 @@ export default function MissionBriefing({ isExpanded, onToggle, checklist, onChe
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Victims</p>
-                <p className="text-sm text-gray-900 dark:text-white font-bold truncate">{incident.victims} persons</p>
+                <p className="text-sm text-gray-900 dark:text-white font-bold truncate">{formattedIncident.victims} persons</p>
               </div>
             </div>
 
@@ -74,7 +76,7 @@ export default function MissionBriefing({ isExpanded, onToggle, checklist, onChe
               <div className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide">Severity</p>
-                <p className="text-sm text-gray-900 dark:text-white font-bold truncate">{incident.severity}</p>
+                <p className="text-sm text-gray-900 dark:text-white font-bold truncate">{formattedIncident.severity}</p>
               </div>
             </div>
           </div>
@@ -84,20 +86,20 @@ export default function MissionBriefing({ isExpanded, onToggle, checklist, onChe
       {/* Scrollable content - Only visible when expanded */}
       {isExpanded && (
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          {/* Incident meta details - Only Time and Caller Phone */}
+          {/* Incident meta details */}
           <div className="grid grid-cols-2 gap-2 text-xs bg-gray-100 dark:bg-gray-900 rounded-lg p-3">
             <div className="text-gray-900 dark:text-gray-100">
-              <span className="font-bold">Time:</span> {incident.timestamp}
+              <span className="font-bold">Time:</span> {formattedIncident.timestamp}
             </div>
             <div className="text-gray-900 dark:text-gray-100">
-              <span className="font-bold">Caller Phone:</span> {incident.callerPhone}
+              <span className="font-bold">Contact:</span> {formattedIncident.callerPhone}
             </div>
           </div>
 
           {/* Notes/Description */}
           <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-800">
             <p className="text-xs font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">Notes</p>
-            <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-line">{incident.notes}</p>
+            <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-line">{formattedIncident.notes}</p>
           </div>
 
           {/* Checklist */}
@@ -132,4 +134,5 @@ export default function MissionBriefing({ isExpanded, onToggle, checklist, onChe
     </div>
   )
 }
+
 

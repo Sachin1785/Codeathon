@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useMode } from "@/contexts/mode-context"
 import BottomNav from "@/components/bottom-nav"
+import { useResponderLocation } from "@/hooks/use-responder-location"
 
 // Responder Views
 import MissionView from "@/components/mission-view"
@@ -19,6 +20,9 @@ import UserProfile from "@/components/user/user-profile"
 
 export default function FieldResponderApp() {
   const { mode } = useMode()
+
+  // Start location pulse if in responder mode (Mock ID 1)
+  useResponderLocation(1, mode === "responder")
   const [activeTab, setActiveTab] = useState(mode === "user" ? "home" : "mission")
   const [preSelectedType, setPreSelectedType] = useState<string | undefined>(undefined)
   const [activeIncident, setActiveIncident] = useState<any>(null)
@@ -29,19 +33,6 @@ export default function FieldResponderApp() {
   }
 
   const handleIncidentSubmitted = (incidentData: any) => {
-    // Create active incident with mock data
-    const newIncident = {
-      id: `INC-${Math.floor(Math.random() * 10000)}`,
-      type: incidentData.type,
-      status: "dispatched",
-      eta: "4 min",
-      responderName: "Officer Sarah Chen",
-      location: "Connaught Place, Delhi",
-      reportedAt: new Date().toISOString()
-    }
-
-    setActiveIncident(newIncident)
-
     // Navigate back to home after a short delay to show the success popup
     setTimeout(() => {
       setActiveTab("home")

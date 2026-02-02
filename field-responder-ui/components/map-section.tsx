@@ -3,17 +3,46 @@
 import { useEffect, useRef, useState } from "react"
 import { Navigation, Clock } from "lucide-react"
 
-export default function MapSection() {
+interface MapSectionProps {
+  activeIncident?: any
+}
+
+export default function MapSection({ activeIncident }: MapSectionProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<any>(null)
   const [isClient, setIsClient] = useState(false)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string }>({
+    distance: "---",
+    duration: "---"
+  })
 
   useEffect(() => {
     setIsClient(true)
+
+    // Get user's actual location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        (error) => {
+          console.error("Geolocation error:", error)
+          // Fallback to default location
+          setUserLocation({ lat: 28.6292, lng: 77.2295 })
+        }
+      )
+    } else {
+      // Fallback if geolocation not supported
+      setUserLocation({ lat: 28.6292, lng: 77.2295 })
+    }
   }, [])
 
   useEffect(() => {
-    if (!mapContainer.current || !isClient || map.current) return
+    if (!mapContainer.current || !isClient || map.current || !userLocation) return
 
     // Dynamically import Leaflet only on the client side
     const initMap = async () => {
@@ -23,16 +52,22 @@ export default function MapSection() {
       await import("leaflet-routing-machine")
       await import("leaflet-routing-machine/dist/leaflet-routing-machine.css")
 
-      // Initialize map centered on Delhi
-      map.current = L.map(mapContainer.current!).setView([28.6328, 77.2197], 13)
+      // Use actual user location and incident location
+      const destLat = activeIncident?.lat || userLocation.lat
+      const destLng = activeIncident?.lng || userLocation.lng
+      const startLat = userLocation.lat
+      const startLng = userLocation.lng
 
-      // Add modern tile layer (CartoDB Voyager for a modern, detailed look)
+      // Initialize map centered on transition between start and end
+      map.current = L.map(mapContainer.current!).setView([(startLat + destLat) / 2, (startLng + destLng) / 2], 13)
+
+      // Add modern tile layer
       L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
         attribution: "&copy; OpenStreetMap contributors &copy; CartoDB",
         maxZoom: 19,
       }).addTo(map.current)
 
-      // Custom icons with iOS blue color
+      // Custom icons
       const startIcon = L.divIcon({
         html: `
           <div class="flex items-center justify-center w-10 h-10 bg-white rounded-full shadow-lg border-3 border-[#007aff]">
@@ -57,11 +92,11 @@ export default function MapSection() {
         iconAnchor: [24, 24],
       })
 
-      // Add routing control with custom styling
+      // Add routing control
       const routing = (L as any).Routing.control({
         waypoints: [
-          L.latLng(28.6292, 77.2295), // Current Location - Rajpath
-          L.latLng(28.6444, 77.2062), // Incident Site - Lok Kalyan Marg
+          L.latLng(startLat, startLng),
+          L.latLng(destLat, destLng),
         ],
         lineOptions: {
           styles: [
@@ -81,20 +116,39 @@ export default function MapSection() {
           })
 
           if (i === 0) {
-            marker.bindPopup("<strong>Current Location</strong><br/>Rajpath, Delhi")
+            marker.bindPopup("<strong>Your Location</strong>")
           } else {
-            marker.bindPopup("<strong>Incident Site</strong><br/>Structural Fire - Lok Kalyan Marg")
+            marker.bindPopup(`<strong>Incident Site</strong><br/>${activeIncident?.type || 'Emergency'} - ${activeIncident?.location_name || 'Active Zone'}`)
           }
 
           return marker
         },
         routeWhileDragging: false,
         addWaypoints: false,
-        show: false, // Hide the routing instructions panel
+        show: false,
         fitSelectedRoutes: true,
       }).addTo(map.current)
 
-      // Hide the routing control container (instructions panel)
+      // Listen for route calculation
+      routing.on('routesfound', function (e: any) {
+        const routes = e.routes
+        const summary = routes[0].summary
+
+        // Calculate distance in km
+        const distanceKm = (summary.totalDistance / 1000).toFixed(1)
+        const distanceStr = distanceKm === "0.0" ? `${summary.totalDistance.toFixed(0)}m` : `${distanceKm}km`
+
+        // Calculate duration in minutes
+        const durationMin = Math.ceil(summary.totalTime / 60)
+        const durationStr = durationMin < 60 ? `${durationMin}min` : `${Math.floor(durationMin / 60)}h ${durationMin % 60}min`
+
+        setRouteInfo({
+          distance: distanceStr,
+          duration: durationStr
+        })
+      })
+
+      // Hide the routing control container
       const routingContainer = document.querySelector(".leaflet-routing-container")
       if (routingContainer) {
         ; (routingContainer as HTMLElement).style.display = "none"
@@ -109,13 +163,13 @@ export default function MapSection() {
         map.current = null
       }
     }
-  }, [isClient])
+  }, [isClient, activeIncident, userLocation])
 
   return (
     <div className="w-full h-full relative z-0">
       <div ref={mapContainer} className="w-full h-full" />
 
-      {/* ETA and Distance Overlay - Top Right Corner */}
+      {/* ETA and Distance Overlay */}
       <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
         {/* Distance Card */}
         <div className="glass-strong rounded-xl px-3 py-2 shadow-apple-lg border border-border/50 min-w-[100px]">
@@ -123,7 +177,7 @@ export default function MapSection() {
             <Navigation className="w-3.5 h-3.5 text-primary" />
             <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Distance</span>
           </div>
-          <div className="text-xl font-bold text-foreground">2.1 km</div>
+          <div className="text-xl font-bold text-foreground">{routeInfo.distance}</div>
         </div>
 
         {/* ETA Card */}
@@ -132,9 +186,10 @@ export default function MapSection() {
             <Clock className="w-3.5 h-3.5 text-success" />
             <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">ETA</span>
           </div>
-          <div className="text-xl font-bold text-success">6 min</div>
+          <div className="text-xl font-bold text-success">{routeInfo.duration}</div>
         </div>
       </div>
     </div>
   )
 }
+

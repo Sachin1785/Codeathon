@@ -1,10 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun, Shield } from "lucide-react"
 import { useTheme } from "next-themes"
 
-export default function MissionHeader({ status }: { status: string }) {
+interface MissionHeaderProps {
+  status: string
+  activeIncident?: any
+}
+
+export default function MissionHeader({ status, activeIncident }: MissionHeaderProps) {
   const [isOnDuty, setIsOnDuty] = useState(true)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -13,12 +18,28 @@ export default function MissionHeader({ status }: { status: string }) {
     setMounted(true)
   }, [])
 
+  const getSeverityColor = (severity: string) => {
+    switch (severity?.toLowerCase()) {
+      case 'critical':
+      case 'high':
+        return 'bg-red-500'
+      case 'warning':
+      case 'medium':
+        return 'bg-orange-500'
+      default:
+        return 'bg-yellow-500'
+    }
+  }
+
   return (
     <div className="sticky top-0 z-40 px-4 py-3 border-b backdrop-blur-md bg-white/80 dark:bg-black/40 border-white/20 dark:border-white/10">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <h1 className="font-semibold text-base text-foreground">Responder ID: FR-2847</h1>
-          <p className="text-xs text-muted-foreground">Officer James Mitchell</p>
+          <h1 className="font-semibold text-base text-foreground flex items-center gap-2">
+            <Shield className="w-4 h-4 text-primary" />
+            Responder ID: FR-104
+          </h1>
+          <p className="text-xs text-muted-foreground">{activeIncident ? `${activeIncident.type} Response` : 'Officer James Mitchell'}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -38,18 +59,22 @@ export default function MissionHeader({ status }: { status: string }) {
           )}
 
           {/* Urgency indicator pill */}
-          <div className="px-3 py-1.5 rounded-full bg-accent/10 border border-accent/30 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span className="text-xs font-medium text-accent">High Priority</span>
-          </div>
+          {activeIncident && (
+            <div className="px-3 py-1.5 rounded-full bg-accent/10 border border-accent/30 flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${getSeverityColor(activeIncident.severity)} animate-pulse`} />
+              <span className="text-[10px] font-bold text-accent uppercase tracking-tighter">
+                {activeIncident.severity || 'Normal'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* On Duty toggle */}
-      <div className="mt-3 flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">Status</span>
+      <div className="mt-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
+        <span className="text-muted-foreground">Current Status</span>
         <label className="flex items-center gap-2 cursor-pointer" onClick={() => setIsOnDuty(!isOnDuty)}>
-          <span className={`font-medium transition-colors ${isOnDuty ? "text-success" : "text-muted-foreground"}`}>
+          <span className={`transition-colors ${isOnDuty ? "text-success" : "text-muted-foreground"}`}>
             {isOnDuty ? "On Duty" : "Off Duty"}
           </span>
           <div
@@ -66,3 +91,4 @@ export default function MissionHeader({ status }: { status: string }) {
     </div>
   )
 }
+

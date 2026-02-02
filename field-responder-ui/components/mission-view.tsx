@@ -1,13 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import MapSection from "@/components/map-section"
 import MissionHeader from "@/components/mission-header"
 import MissionBriefing from "@/components/mission-briefing"
 import StatusBar from "@/components/status-bar"
 import ActionButtons from "@/components/action-buttons"
+import { incidentsAPI, personnelAPI } from "@/lib/api"
+import { useWebSocket } from "@/hooks/use-websocket"
+import { Loader2 } from "lucide-react"
 
 export default function MissionView() {
+    const [activeIncident, setActiveIncident] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
     const [status, setStatus] = useState<"en-route" | "arrived" | "complete">("en-route")
     const [checklist, setChecklist] = useState({
         staging: false,
@@ -16,6 +21,55 @@ export default function MissionView() {
         victims: false,
     })
     const [missionExpanded, setMissionExpanded] = useState(false)
+    const responderId = 1 // Mock ID
+
+    const { on, isConnected } = useWebSocket({
+        autoConnect: true,
+        onConnect: () => console.log('MissionView connected to WebSocket'),
+    })
+
+    const fetchActiveMission = async () => {
+        try {
+            setLoading(true)
+
+            // 1. Get responder status and assignment
+            const pResponse = await personnelAPI.getById(responderId)
+            if (pResponse.success) {
+                const person = pResponse.personnel
+
+                // Map backend status to UI status
+                if (person.status === 'on-scene') setStatus('arrived')
+                else if (person.status === 'en-route') setStatus('en-route')
+                else if (person.status === 'responding') setStatus('en-route') // Default to en-route for starting
+
+                if (person.assigned_incident_id) {
+                    const iResponse = await incidentsAPI.getById(person.assigned_incident_id)
+                    if (iResponse.success) {
+                        setActiveIncident(iResponse.incident)
+                    }
+                } else {
+                    setActiveIncident(null)
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching active mission:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchActiveMission()
+    }, [])
+
+    useEffect(() => {
+        if (!isConnected) return
+        const refresh = () => fetchActiveMission()
+        on('incident_updated', refresh)
+        on('incident_created', refresh)
+        on('personnel_assigned', refresh)
+        return () => { }
+    }, [isConnected, on])
 
     const handleChecklistToggle = (item: string) => {
         if (item in checklist) {
@@ -23,20 +77,55 @@ export default function MissionView() {
         }
     }
 
-    const handleStatusChange = (newStatus: "en-route" | "arrived" | "complete") => {
-        setStatus(newStatus)
+    const handleStatusChange = async (newStatus: "en-route" | "arrived" | "complete") => {
+        try {
+            // Map UI status to backend status
+            const backendStatus = newStatus === 'arrived' ? 'on-scene' :
+                newStatus === 'en-route' ? 'en-route' : 'available'
+
+            setStatus(newStatus)
+            await personnelAPI.updateStatus(responderId, backendStatus)
+
+            if (newStatus === 'complete') {
+                // Clear active incident and go back to discovery or show summary
+                setActiveIncident(null)
+                alert("Mission completed successfully!")
+            }
+        } catch (error) {
+            console.error("Failed to update status:", error)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex h-full items-center justify-center">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    if (!activeIncident) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+                <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                    <Loader2 className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-bold mb-2">No Active Mission</h2>
+                <p className="text-muted-foreground">You don't have any missions assigned right now. Check the incidents tab for new reports.</p>
+            </div>
+        )
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-background overflow-hidden">
+        <div className="flex flex-col h-full w-full bg-background overflow-hidden font-sans">
             {/* Header with glassmorphism */}
             <div className="flex-shrink-0 z-40">
-                <MissionHeader status={status} />
+                <MissionHeader status={status} activeIncident={activeIncident} />
             </div>
 
             {/* Map section - takes remaining space above bottom sheet */}
             <div className="relative w-full flex-1 overflow-hidden">
-                <MapSection />
+                <MapSection activeIncident={activeIncident} />
             </div>
 
             {/* Mission briefing bottom sheet - positioned at bottom with peek */}
@@ -45,6 +134,7 @@ export default function MissionView() {
                 onToggle={() => setMissionExpanded(!missionExpanded)}
                 checklist={checklist}
                 onChecklistToggle={handleChecklistToggle}
+                incident={activeIncident}
             />
 
             {/* Status bar with functional buttons */}
@@ -55,3 +145,4 @@ export default function MissionView() {
         </div>
     )
 }
+

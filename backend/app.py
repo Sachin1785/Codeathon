@@ -140,7 +140,7 @@ def handle_location_update(data):
             'name': person['name'],
             'location': {'lat': lat, 'lng': lng},
             'status': person['status']
-        }, broadcast=True)
+        })
         
         # If assigned to incident, broadcast to incident room
         if person['assigned_incident_id']:
@@ -173,7 +173,7 @@ def handle_incident_update(data):
             'type': update_type,
             'data': update_data,
             'timestamp': data.get('timestamp')
-        }, broadcast=True)
+        })
 
 @socketio.on('new_message')
 def handle_new_message(data):
@@ -234,7 +234,7 @@ def handle_status_update(data):
             'name': person['name'],
             'status': status,
             'assigned_incident_id': person['assigned_incident_id']
-        }, broadcast=True)
+        })
 
 @socketio.on('geofence_breach')
 def handle_geofence_breach(data):
@@ -250,7 +250,39 @@ def handle_geofence_breach(data):
         'location': location,
         'alert_type': 'breach',
         'priority': 'critical'
-    }, broadcast=True)
+    })
+
+@socketio.on('broadcast_message')
+def handle_broadcast_message(data):
+    """Handle broadcast message to all responders"""
+    message = data.get('message')
+    sender_name = data.get('sender_name', 'Anonymous')
+    sender_id = data.get('sender_id')
+    
+    if message:
+        # Save to database with incident_id = NULL for broadcast messages
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO communications (incident_id, sender_name, message, type)
+            VALUES (?, ?, ?, ?)
+        ''', (None, sender_name, message, 'broadcast'))
+        
+        comm_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # Broadcast to ALL connected clients
+        socketio.emit('broadcast_received', {
+            'comm_id': comm_id,
+            'sender_name': sender_name,
+            'sender_id': sender_id,
+            'message': message,
+            'timestamp': data.get('timestamp'),
+            'type': 'broadcast'
+        })
+
 
 # Helper function to broadcast from routes
 def broadcast_event(event_name, data, room=None):
@@ -258,7 +290,7 @@ def broadcast_event(event_name, data, room=None):
     if room:
         socketio.emit(event_name, data, room=room)
     else:
-        socketio.emit(event_name, data, broadcast=True)
+        socketio.emit(event_name, data)
 
 # Make broadcast function available to routes
 app.broadcast_event = broadcast_event

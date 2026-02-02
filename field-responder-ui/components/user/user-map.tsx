@@ -16,27 +16,53 @@ interface UserMapProps {
 export default function UserMap({ incidents = [] }: UserMapProps) {
     const mapContainer = useRef<HTMLDivElement>(null)
     const map = useRef<any>(null)
+    const markersLayer = useRef<any>(null)
     const [isClient, setIsClient] = useState(false)
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
 
     useEffect(() => {
         setIsClient(true)
+
+        // Get user's actual location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    })
+                },
+                (error) => {
+                    console.error("Error getting location:", error)
+                    // Fallback to Delhi if geolocation fails
+                    setUserLocation({ lat: 28.6139, lng: 77.2090 })
+                }
+            )
+        } else {
+            // Fallback to Delhi if geolocation not supported
+            setUserLocation({ lat: 28.6139, lng: 77.2090 })
+        }
     }, [])
 
+    // Initialize map only once
     useEffect(() => {
-        if (!mapContainer.current || !isClient || map.current) return
+        if (!mapContainer.current || !isClient || !userLocation || map.current) return
 
         const initMap = async () => {
             const L = (await import("leaflet")).default
             await import("leaflet/dist/leaflet.css")
 
-            // Initialize map centered on Delhi
-            map.current = L.map(mapContainer.current!).setView([28.6139, 77.2090], 12)
+            // Initialize map centered on user's location
+            map.current = L.map(mapContainer.current!).setView([userLocation.lat, userLocation.lng], 12)
 
             // Add tile layer
             L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
                 attribution: "&copy; OpenStreetMap contributors &copy; CartoDB",
                 maxZoom: 19,
             }).addTo(map.current)
+
+            // Create a layer group for markers
+            markersLayer.current = L.layerGroup().addTo(map.current)
 
             // Add user location marker
             const userIcon = L.divIcon({
@@ -50,9 +76,49 @@ export default function UserMap({ incidents = [] }: UserMapProps) {
                 iconAnchor: [24, 24],
             })
 
-            L.marker([28.6139, 77.2090], { icon: userIcon })
-                .addTo(map.current)
-                .bindPopup("<strong>Your Location</strong><br/>Connaught Place, Delhi")
+            L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+                .addTo(markersLayer.current)
+                .bindPopup("<strong>Your Location</strong>")
+        }
+
+        initMap()
+
+        return () => {
+            if (map.current) {
+                map.current.remove()
+                map.current = null
+                markersLayer.current = null
+            }
+        }
+    }, [isClient, userLocation])
+
+    // Update incident markers when incidents change
+    useEffect(() => {
+        if (!map.current || !markersLayer.current) return
+
+        const updateIncidents = async () => {
+            const L = (await import("leaflet")).default
+
+            // Clear existing incident markers (keep user marker)
+            markersLayer.current.clearLayers()
+
+            // Re-add user marker
+            if (userLocation) {
+                const userIcon = L.divIcon({
+                    html: `
+            <div class="flex items-center justify-center w-12 h-12 bg-blue-500 rounded-full shadow-lg border-4 border-white animate-pulse">
+              <div class="w-3 h-3 bg-white rounded-full"></div>
+            </div>
+          `,
+                    className: "",
+                    iconSize: [48, 48],
+                    iconAnchor: [24, 24],
+                })
+
+                L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+                    .addTo(markersLayer.current)
+                    .bindPopup("<strong>Your Location</strong>")
+            }
 
             // Add incident markers
             incidents.forEach((incident) => {
@@ -74,7 +140,7 @@ export default function UserMap({ incidents = [] }: UserMapProps) {
                 })
 
                 L.marker([incident.lat, incident.lng], { icon: incidentIcon })
-                    .addTo(map.current)
+                    .addTo(markersLayer.current)
                     .bindPopup(`
             <div class="p-2">
               <strong class="text-sm">${incident.type}</strong><br/>
@@ -84,15 +150,8 @@ export default function UserMap({ incidents = [] }: UserMapProps) {
             })
         }
 
-        initMap()
-
-        return () => {
-            if (map.current) {
-                map.current.remove()
-                map.current = null
-            }
-        }
-    }, [isClient, incidents])
+        updateIncidents()
+    }, [incidents, userLocation])
 
     return <div ref={mapContainer} className="w-full h-full" />
 }

@@ -5,7 +5,11 @@ echo ========================================
 echo.
 
 REM Activate virtual environment
-call venv\Scripts\activate.bat
+if exist ".venv" (
+    call .venv\Scripts\activate.bat
+) else if exist "venv" (
+    call venv\Scripts\activate.bat
+)
 
 REM Start the server
 echo Starting Flask server with WebSocket support...

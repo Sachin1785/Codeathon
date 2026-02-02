@@ -1,11 +1,21 @@
 "use client"
 
-import { useState } from "react"
-import { Filter, MapPin, Clock, AlertCircle } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Filter, MapPin, Clock, AlertCircle, Loader2 } from "lucide-react"
 import UserMap from "./user-map"
+import { incidentsAPI } from "@/lib/api"
+import { useWebSocket } from "@/hooks/use-websocket"
 
 export default function NearbyAlerts() {
     const [selectedFilter, setSelectedFilter] = useState<string>("all")
+    const [alerts, setAlerts] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+
+    const { on, isConnected } = useWebSocket({
+        autoConnect: true,
+        onConnect: () => console.log('NearbyAlerts connected to WebSocket'),
+    })
 
     const filters = [
         { id: "all", label: "All" },
@@ -15,74 +25,155 @@ export default function NearbyAlerts() {
         { id: "accident", label: "Accident" },
     ]
 
-    const alerts = [
-        {
-            id: 1,
-            type: "Fire",
-            location: "Block 4, Connaught Place",
-            distance: "2.1 km",
-            time: "5 min ago",
-            severity: "high" as const,
-            status: "Active",
-            details: "Structural fire reported on 2nd floor",
-            lat: 28.6328,
-            lng: 77.2197
-        },
-        {
-            id: 2,
-            type: "Medical",
-            location: "Rajpath, Central Delhi",
-            distance: "3.5 km",
-            time: "12 min ago",
-            severity: "medium" as const,
-            status: "Responding",
-            details: "Medical emergency - cardiac arrest",
-            lat: 28.6129,
-            lng: 77.2295
-        },
-        {
-            id: 3,
-            type: "Accident",
-            location: "India Gate Circle",
-            distance: "4.2 km",
-            time: "18 min ago",
-            severity: "low" as const,
-            status: "Resolved",
-            details: "Minor vehicle collision",
-            lat: 28.6127,
-            lng: 77.2295
-        },
-        {
-            id: 4,
-            type: "Police",
-            location: "Khan Market",
-            distance: "5.8 km",
-            time: "25 min ago",
-            severity: "medium" as const,
-            status: "Active",
-            details: "Security incident reported",
-            lat: 28.6000,
-            lng: 77.2300
-        },
-    ]
+    // Calculate distance between two points using Haversine formula
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371 // Radius of the Earth in km
+        const dLat = (lat2 - lat1) * Math.PI / 180
+        const dLon = (lon2 - lon1) * Math.PI / 180
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        const distance = R * c // Distance in km
+        return distance
+    }
+
+    const formatDistance = (distanceKm: number): string => {
+        if (distanceKm < 1) {
+            return `${Math.round(distanceKm * 1000)}m`
+        } else if (distanceKm < 10) {
+            return `${distanceKm.toFixed(1)}km`
+        } else {
+            return `${Math.round(distanceKm)}km`
+        }
+    }
+
+    // Fetch alerts (incidents)
+    const fetchAlerts = async () => {
+        try {
+            setLoading(true)
+            const response = await incidentsAPI.getAll()
+            if (response.success) {
+                const formattedAlerts = response.incidents.map((inc: any) => {
+                    const distance = userLocation
+                        ? calculateDistance(userLocation.lat, userLocation.lng, inc.lat, inc.lng)
+                        : null
+
+                    return {
+                        id: inc.id,
+                        type: inc.type.charAt(0).toUpperCase() + inc.type.slice(1),
+                        location: inc.location_name || `${inc.lat.toFixed(4)}, ${inc.lng.toFixed(4)}`,
+                        distance: distance !== null ? formatDistance(distance) : "Calculating...",
+                        distanceKm: distance,
+                        time: formatTime(inc.created_at),
+                        severity: inc.severity,
+                        status: inc.status.charAt(0).toUpperCase() + inc.status.slice(1),
+                        details: inc.description,
+                        lat: inc.lat,
+                        lng: inc.lng
+                    }
+                })
+
+                // Filter incidents within 50km and sort by distance
+                const nearbyAlerts = formattedAlerts
+                    .filter((alert: any) => alert.distanceKm === null || alert.distanceKm <= 50)
+                    .sort((a: any, b: any) => {
+                        if (a.distanceKm === null) return 1
+                        if (b.distanceKm === null) return -1
+                        return a.distanceKm - b.distanceKm
+                    })
+
+                setAlerts(nearbyAlerts)
+            }
+        } catch (error) {
+            console.error("Error fetching alerts:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString)
+        const now = new Date()
+        const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+
+        if (diffMinutes < 1) return "Just now"
+        if (diffMinutes < 60) return `${diffMinutes} min ago`
+        return `${Math.floor(diffMinutes / 60)}h ago`
+    }
+
+    useEffect(() => {
+        // Get user location first
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+                },
+                (error) => {
+                    console.error("Error getting location:", error)
+                    // Fallback to Delhi
+                    setUserLocation({ lat: 28.6139, lng: 77.2090 })
+                }
+            )
+        } else {
+            // Fallback to Delhi
+            setUserLocation({ lat: 28.6139, lng: 77.2090 })
+        }
+    }, [])
+
+    useEffect(() => {
+        // Fetch alerts once we have user location
+        if (userLocation) {
+            fetchAlerts()
+        }
+    }, [userLocation])
+
+    useEffect(() => {
+        if (!isConnected) return
+
+        const handleIncidentUpdate = (data: any) => {
+            console.log("WebSocket incident update:", data)
+            // Refresh the entire list for simplicity, or we could update specifically
+            fetchAlerts()
+        }
+
+        on('incident_updated', handleIncidentUpdate)
+        // Also listen for new incidents if the backend emits 'incident_created'
+        on('incident_created', handleIncidentUpdate)
+
+        return () => {
+            // cleanup is handled by hook but good practice to show intent
+        }
+    }, [isConnected, on, userLocation])
 
     const getSeverityColor = (severity: string) => {
-        switch (severity) {
-            case "high": return "bg-red-500"
-            case "medium": return "bg-orange-500"
-            case "low": return "bg-yellow-500"
+        switch (severity.toLowerCase()) {
+            case "high":
+            case "critical": return "bg-red-500"
+            case "medium":
+            case "warning": return "bg-orange-500"
+            case "low":
+            case "info": return "bg-yellow-500"
             default: return "bg-gray-500"
         }
     }
 
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case "Active": return "text-red-500"
-            case "Responding": return "text-orange-500"
-            case "Resolved": return "text-green-500"
+        switch (status.toLowerCase()) {
+            case "active":
+            case "new": return "text-red-500"
+            case "responding":
+            case "on-scene": return "text-orange-500"
+            case "resolved":
+            case "closed": return "text-green-500"
             default: return "text-gray-500"
         }
     }
+
+    const filteredAlerts = selectedFilter === "all"
+        ? alerts
+        : alerts.filter(a => a.type.toLowerCase() === selectedFilter.toLowerCase())
 
     return (
         <div className="flex flex-col h-full bg-background overflow-hidden pb-16">
@@ -94,7 +185,13 @@ export default function NearbyAlerts() {
 
             {/* Map with Incidents */}
             <div className="relative h-[250px] bg-muted/30 border-b border-border">
-                <UserMap incidents={alerts} />
+                {loading || !userLocation ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                ) : (
+                    <UserMap incidents={filteredAlerts} />
+                )}
             </div>
 
             {/* Filters */}
@@ -122,60 +219,75 @@ export default function NearbyAlerts() {
 
             {/* Alerts List */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-                {alerts.map((alert) => (
-                    <div
-                        key={alert.id}
-                        className="card-elevated rounded-2xl p-4 shadow-apple border border-border/50 hover:border-primary/30 transition-all"
-                    >
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <div className={`w-3 h-3 rounded-full ${getSeverityColor(alert.severity)} animate-pulse`} />
-                                <h3 className="font-bold text-base text-foreground">{alert.type}</h3>
-                            </div>
-                            <span className={`text-xs font-semibold ${getStatusColor(alert.status)}`}>
-                                {alert.status}
-                            </span>
-                        </div>
-
-                        {/* Details */}
-                        <p className="text-sm text-muted-foreground mb-3">{alert.details}</p>
-
-                        {/* Meta Info */}
-                        <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-1 text-muted-foreground">
-                                    <MapPin className="w-3 h-3" />
-                                    <span>{alert.distance}</span>
-                                </div>
-                                <div className="flex items-center gap-1 text-muted-foreground">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{alert.time}</span>
-                                </div>
-                            </div>
-                            <button className="text-primary font-semibold">View Details</button>
-                        </div>
-
-                        {/* Location */}
-                        <div className="mt-3 pt-3 border-t border-border/50">
-                            <p className="text-xs text-muted-foreground">{alert.location}</p>
-                        </div>
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-10 opacity-50">
+                        <Loader2 className="w-10 h-10 animate-spin mb-4" />
+                        <p className="text-sm">Fetching active alerts...</p>
                     </div>
-                ))}
+                ) : filteredAlerts.length === 0 ? (
+                    <div className="text-center py-10">
+                        <p className="text-muted-foreground">No active alerts found nearby.</p>
+                    </div>
+                ) : (
+                    filteredAlerts.map((alert) => (
+                        <div
+                            key={alert.id}
+                            className="card-elevated rounded-2xl p-4 shadow-apple border border-border/50 hover:border-primary/30 transition-all"
+                        >
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${getSeverityColor(alert.severity)} animate-pulse`} />
+                                    <h3 className="font-bold text-base text-foreground">{alert.type}</h3>
+                                </div>
+                                <span className={`text-xs font-semibold ${getStatusColor(alert.status)}`}>
+                                    {alert.status}
+                                </span>
+                            </div>
+
+                            {/* Details */}
+                            <p className="text-sm text-muted-foreground mb-3">{alert.details}</p>
+
+                            {/* Meta Info */}
+                            <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                        <MapPin className="w-3 h-3" />
+                                        <span className="font-semibold">{alert.distance}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                        <Clock className="w-3 h-3" />
+                                        <span>{alert.time}</span>
+                                    </div>
+                                </div>
+                                <button className="text-primary font-semibold">View Details</button>
+                            </div>
+
+                            {/* Location */}
+                            <div className="mt-3 pt-3 border-t border-border/50">
+                                <p className="text-xs text-muted-foreground">{alert.location}</p>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* Safety Banner */}
-            <div className="px-4 pb-4">
-                <div className="glass-strong rounded-xl p-3 border border-primary/30 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
-                        <AlertCircle className="w-4 h-4 text-success" />
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-xs font-semibold text-foreground">You're Safe</p>
-                        <p className="text-xs text-muted-foreground">No active alerts in your immediate area</p>
+            {!loading && filteredAlerts.length === 0 && (
+                <div className="px-4 pb-4">
+                    <div className="glass-strong rounded-xl p-3 border border-primary/30 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                            <AlertCircle className="w-4 h-4 text-success" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-xs font-semibold text-foreground">You're Safe</p>
+                            <p className="text-xs text-muted-foreground">No active alerts in your immediate area</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }
+
+

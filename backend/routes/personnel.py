@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from database import get_db_connection
 from datetime import datetime
 
@@ -105,13 +105,37 @@ def update_personnel_location(personnel_id):
     ''', (data['lat'], data['lng'], datetime.now().isoformat(), personnel_id))
     
     conn.commit()
+    
+    # Get personnel info for broadcasting
+    cursor.execute('SELECT name, status, assigned_incident_id FROM personnel WHERE id = ?', (personnel_id,))
+    person = cursor.fetchone()
+    
     conn.close()
+    
+    if person:
+        # Broadcast to all
+        current_app.broadcast_event('personnel_location_updated', {
+            'personnel_id': personnel_id,
+            'name': person['name'],
+            'location': {'lat': data['lat'], 'lng': data['lng']},
+            'status': person['status']
+        })
+        
+        # If assigned, broadcast to incident room
+        if person['assigned_incident_id']:
+            current_app.broadcast_event('personnel_location_updated', {
+                'personnel_id': personnel_id,
+                'name': person['name'],
+                'location': {'lat': data['lat'], 'lng': data['lng']},
+                'status': person['status']
+            }, room=f'incident_{person["assigned_incident_id"]}')
     
     return jsonify({
         'success': True,
         'personnel_id': personnel_id,
         'location': {'lat': data['lat'], 'lng': data['lng']}
     })
+
 
 @personnel_bp.route('/personnel/<int:personnel_id>/status', methods=['PUT'])
 def update_personnel_status(personnel_id):
@@ -163,11 +187,20 @@ def update_personnel_status(personnel_id):
     conn.commit()
     conn.close()
     
+    # Broadcast status change
+    current_app.broadcast_event('personnel_status_updated', {
+        'personnel_id': personnel_id,
+        'name': person['name'],
+        'status': data['status'],
+        'assigned_incident_id': person['assigned_incident_id'] if data['status'] != 'available' else None
+    })
+    
     return jsonify({
         'success': True,
         'personnel_id': personnel_id,
         'status': data['status']
     })
+
 
 @personnel_bp.route('/personnel', methods=['POST'])
 def create_personnel():
@@ -231,3 +264,74 @@ def get_available_personnel():
         'personnel': personnel,
         'count': len(personnel)
     })
+
+@personnel_bp.route('/personnel/<int:personnel_id>/assign', methods=['POST'])
+def assign_personnel_to_incident(personnel_id):
+    """Assign personnel to an incident (Self-Assignment)"""
+    data = request.get_json()
+    
+    if 'incident_id' not in data:
+        return jsonify({'success': False, 'error': 'Missing incident_id'}), 400
+    
+    incident_id = data['incident_id']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Check if personnel exists
+    cursor.execute('SELECT * FROM personnel WHERE id = ?', (personnel_id,))
+    person = cursor.fetchone()
+    if not person:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Personnel not found'}), 404
+        
+    person = dict(person)
+    
+    # Check if incident exists
+    cursor.execute('SELECT * FROM incidents WHERE id = ?', (incident_id,))
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify({'success': False, 'error': 'Incident not found'}), 404
+        
+    # Perform assignment
+    cursor.execute('''
+        UPDATE personnel
+        SET assigned_incident_id = ?, status = 'responding', updated_at = ?
+        WHERE id = ?
+    ''', (incident_id, datetime.now().isoformat(), personnel_id))
+    
+    # Add timeline event to incident
+    cursor.execute('''
+        INSERT INTO incident_timeline (incident_id, event_type, description, user_name)
+        VALUES (?, ?, ?, ?)
+    ''', (
+        incident_id,
+        'personnel_assigned',
+        f'{person["name"]} self-assigned to incident',
+        'System'
+    ))
+    
+    conn.commit()
+    conn.close()
+    
+    # Broadcast status change
+    current_app.broadcast_event('personnel_status_updated', {
+        'personnel_id': personnel_id,
+        'name': person['name'],
+        'status': 'responding',
+        'assigned_incident_id': incident_id
+    })
+    
+    # Broadcast assignment
+    current_app.broadcast_event('personnel_assigned', {
+        'personnel_id': personnel_id,
+        'incident_id': incident_id
+    })
+    
+    return jsonify({
+        'success': True,
+        'personnel_id': personnel_id,
+        'incident_id': incident_id,
+        'status': 'responding'
+    })
+
+

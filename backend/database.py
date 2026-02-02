@@ -27,6 +27,7 @@ def init_db():
             location_name TEXT,
             report_source TEXT,
             reported_by INTEGER,
+            victims_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             resolved_at TIMESTAMP

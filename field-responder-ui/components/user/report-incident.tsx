@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Flame, Heart, Shield, AlertTriangle, Car, Zap, MapPin, Camera, Send, CheckCircle } from "lucide-react"
+import { incidentsAPI } from "@/lib/api"
 
 interface ReportIncidentProps {
     preSelectedType?: string
@@ -15,7 +16,33 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
     const [isAnonymous, setIsAnonymous] = useState(false)
     const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
     const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+    const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [locationName, setLocationName] = useState("Getting location...")
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Get user's location on mount
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords
+                    setLocation({ lat: latitude, lng: longitude })
+                    setLocationName(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+                },
+                (error) => {
+                    console.error("Error getting location:", error)
+                    // Default to Delhi location if geolocation fails
+                    setLocation({ lat: 28.7041, lng: 77.1025 })
+                    setLocationName("Delhi, India (Default)")
+                }
+            )
+        } else {
+            // Default location if geolocation not supported
+            setLocation({ lat: 28.7041, lng: 77.1025 })
+            setLocationName("Delhi, India (Default)")
+        }
+    }, [])
 
     const incidentTypes = [
         { id: "fire", icon: Flame, label: "Fire", color: "bg-red-500" },
@@ -37,34 +64,64 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
         }
     }
 
-    const handleSubmit = () => {
-        const incidentData = {
-            type: selectedType,
-            description,
-            severity,
-            isAnonymous,
-            photo: selectedPhoto?.name
+    const handleSubmit = async () => {
+        if (!selectedType || !description || !location) {
+            return
         }
 
-        console.log("Submitting incident:", incidentData)
+        setIsSubmitting(true)
 
-        // Call parent callback
-        if (onSubmit) {
-            onSubmit(incidentData)
+        try {
+            // Create incident via API
+            const incidentData = {
+                title: `${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Emergency`,
+                description,
+                type: selectedType,
+                severity,
+                lat: location.lat,
+                lng: location.lng,
+                location_name: locationName,
+                report_source: "mobile-app",
+            }
+
+            const response = await incidentsAPI.create(incidentData)
+
+            if (response.success) {
+                const incidentId = response.incident_id
+
+                // Upload photo if selected
+                if (selectedPhoto) {
+                    try {
+                        await incidentsAPI.uploadFile(incidentId, selectedPhoto)
+                    } catch (error) {
+                        console.error("Error uploading photo:", error)
+                    }
+                }
+
+                // Call parent callback
+                if (onSubmit) {
+                    onSubmit({ ...incidentData, id: incidentId })
+                }
+
+                // Show success popup
+                setShowSuccessPopup(true)
+
+                // Reset form after 3 seconds
+                setTimeout(() => {
+                    setShowSuccessPopup(false)
+                    setSelectedType(null)
+                    setDescription("")
+                    setSeverity("medium")
+                    setIsAnonymous(false)
+                    setSelectedPhoto(null)
+                    setIsSubmitting(false)
+                }, 3000)
+            }
+        } catch (error) {
+            console.error("Error submitting incident:", error)
+            alert("Failed to submit incident. Please try again.")
+            setIsSubmitting(false)
         }
-
-        // Show success popup
-        setShowSuccessPopup(true)
-
-        // Reset form after 3 seconds
-        setTimeout(() => {
-            setShowSuccessPopup(false)
-            setSelectedType(null)
-            setDescription("")
-            setSeverity("medium")
-            setIsAnonymous(false)
-            setSelectedPhoto(null)
-        }, 3000)
     }
 
     return (
@@ -115,9 +172,8 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
                         <MapPin className="w-5 h-5 text-primary" />
                         <div className="flex-1">
                             <p className="text-sm font-medium text-foreground">Current Location</p>
-                            <p className="text-xs text-muted-foreground">Connaught Place, Delhi</p>
+                            <p className="text-xs text-muted-foreground">{locationName}</p>
                         </div>
-                        <button className="text-xs text-primary font-semibold">Change</button>
                     </div>
                 </div>
 
@@ -207,18 +263,18 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
                 {/* Submit Button */}
                 <button
                     onClick={handleSubmit}
-                    disabled={!selectedType || !description}
+                    disabled={!selectedType || !description || !location || isSubmitting}
                     className={`
             w-full py-4 rounded-2xl font-bold text-base shadow-apple-lg
             transition-all duration-300 ios-press flex items-center justify-center gap-2
-            ${selectedType && description
+            ${selectedType && description && location && !isSubmitting
                             ? "bg-primary text-primary-foreground hover:scale-105 active:scale-95"
                             : "bg-muted/50 text-muted-foreground cursor-not-allowed"
                         }
           `}
                 >
                     <Send className="w-5 h-5" />
-                    Submit Report
+                    {isSubmitting ? "Submitting..." : "Submit Report"}
                 </button>
 
                 <p className="text-xs text-center text-muted-foreground">

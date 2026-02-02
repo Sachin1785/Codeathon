@@ -214,7 +214,7 @@ def update_incident(incident_id):
     update_fields = []
     params = []
     
-    allowed_fields = ['title', 'description', 'type', 'severity', 'status', 'lat', 'lng', 'location_name']
+    allowed_fields = ['title', 'description', 'type', 'severity', 'status', 'lat', 'lng', 'location_name', 'victims_count']
     for field in allowed_fields:
         if field in data:
             update_fields.append(f'{field} = ?')

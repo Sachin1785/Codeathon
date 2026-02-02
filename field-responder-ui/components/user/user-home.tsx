@@ -1,7 +1,10 @@
 "use client"
 
-import { Flame, Heart, Shield, AlertTriangle, MapPin, Clock, CheckCircle } from "lucide-react"
-import { useState } from "react"
+import { Flame, Heart, Shield, AlertTriangle, MapPin, Clock, CheckCircle, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { incidentsAPI } from "@/lib/api"
+import { useWebSocket } from "@/hooks/use-websocket"
+import { calculateDistance } from "@/lib/utils"
 
 interface UserHomeProps {
     onNavigateToReport?: (type: string) => void
@@ -9,6 +12,14 @@ interface UserHomeProps {
 }
 
 export default function UserHome({ onNavigateToReport, activeIncident }: UserHomeProps) {
+    const [nearbyIncidents, setNearbyIncidents] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+
+    const { on, isConnected } = useWebSocket({
+        autoConnect: true,
+        onConnect: () => console.log('UserHome connected to WebSocket'),
+    })
 
     const emergencyTypes = [
         { id: "fire", icon: Flame, label: "Fire", color: "bg-red-500", hoverColor: "hover:bg-red-600" },
@@ -17,14 +28,70 @@ export default function UserHome({ onNavigateToReport, activeIncident }: UserHom
         { id: "other", icon: AlertTriangle, label: "Other", color: "bg-orange-500", hoverColor: "hover:bg-orange-600" },
     ]
 
-    const nearbyIncidents = [
-        { id: 1, type: "Fire", location: "Block 4, CP", distance: "2.1 km", time: "5 min ago", severity: "high" },
-        { id: 2, type: "Medical", location: "Rajpath", distance: "3.5 km", time: "12 min ago", severity: "medium" },
-        { id: 3, type: "Accident", location: "India Gate", distance: "4.2 km", time: "18 min ago", severity: "low" },
-    ]
+    const fetchNearbyIncidents = async () => {
+        try {
+            setLoading(true)
+
+            if (!userLocation && navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+                })
+            }
+
+            const response = await incidentsAPI.getAll()
+            if (response.success) {
+                // Get most recent 3 active/new incidents
+                const recent = response.incidents
+                    .filter((inc: any) => inc.status === 'active' || inc.status === 'new')
+                    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(0, 3)
+                    .map((inc: any) => {
+                        let distanceStr = "---"
+                        if (userLocation) {
+                            const dist = calculateDistance(userLocation.lat, userLocation.lng, inc.lat, inc.lng)
+                            distanceStr = dist < 1 ? `${(dist * 1000).toFixed(0)}m` : `${dist.toFixed(1)}km`
+                        }
+
+                        return {
+                            id: inc.id,
+                            type: inc.type.charAt(0).toUpperCase() + inc.type.slice(1),
+                            location: inc.location_name || `${inc.lat.toFixed(2)}, ${inc.lng.toFixed(2)}`,
+                            distance: distanceStr,
+                            time: formatTime(inc.created_at),
+                            severity: inc.severity
+                        }
+                    })
+                setNearbyIncidents(recent)
+            }
+        } catch (error) {
+            console.error("Error fetching incidents:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString)
+        const now = new Date()
+        const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+        if (diffMinutes < 1) return "Just now"
+        if (diffMinutes < 60) return `${diffMinutes}m ago`
+        return `${Math.floor(diffMinutes / 60)}h ago`
+    }
+
+    useEffect(() => {
+        fetchNearbyIncidents()
+    }, [userLocation])
+
+    useEffect(() => {
+        if (!isConnected) return
+        const refresh = () => fetchNearbyIncidents()
+        on('incident_updated', refresh)
+        on('incident_created', refresh)
+        return () => { }
+    }, [isConnected, on])
 
     const handleEmergencyClick = (type: string) => {
-        // Navigate to report page with pre-selected type
         if (onNavigateToReport) {
             onNavigateToReport(type)
         }
@@ -36,14 +103,14 @@ export default function UserHome({ onNavigateToReport, activeIncident }: UserHom
             <div className="gradient-header border-b border-border px-4 py-6">
                 <div className="flex items-center justify-between mb-2">
                     <h1 className="text-2xl font-bold">Safety Center</h1>
-                    <div className={`w-3 h-3 rounded-full animate-pulse ${activeIncident ? "bg-warning" : "bg-success"}`} />
+                    <div className={`w-3 h-3 rounded-full animate-pulse ${activeIncident || nearbyIncidents.length > 0 ? "bg-red-500" : "bg-success"}`} />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                    {activeIncident ? "Help is on the way" : "You're in a safe area"}
+                    {activeIncident ? "Help is on the way" : nearbyIncidents.length > 0 ? "Incidents reported nearby" : "You're in a safe area"}
                 </p>
             </div>
 
-            {/* Active Incident Tracker (only shown if user has active incident) */}
+            {/* Active Incident Tracker */}
             {activeIncident && (
                 <div className="mx-4 mt-4">
                     <div className="card-elevated rounded-2xl p-4 shadow-apple-lg border-2 border-primary/30">
@@ -60,11 +127,11 @@ export default function UserHome({ onNavigateToReport, activeIncident }: UserHom
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 text-sm">
                                 <Clock className="w-4 h-4 text-success" />
-                                <span className="font-semibold text-success">ETA: {activeIncident.eta}</span>
+                                <span className="font-semibold text-success">ETA: {activeIncident.eta || '4 min'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Shield className="w-4 h-4" />
-                                <span>{activeIncident.responderName}</span>
+                                <span>{activeIncident.responderName || 'Officer Sarah Chen'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <MapPin className="w-4 h-4" />
@@ -116,28 +183,36 @@ export default function UserHome({ onNavigateToReport, activeIncident }: UserHom
                     <button className="text-xs text-primary font-semibold">View All</button>
                 </div>
                 <div className="space-y-2">
-                    {nearbyIncidents.map((incident) => (
-                        <div
-                            key={incident.id}
-                            className="card-elevated rounded-xl p-3 shadow-apple border border-border/50 hover:border-primary/30 transition-all"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className={`w-2 h-2 rounded-full ${incident.severity === "high" ? "bg-red-500" :
-                                            incident.severity === "medium" ? "bg-orange-500" : "bg-yellow-500"
-                                            }`} />
-                                        <h3 className="font-semibold text-sm text-foreground">{incident.type}</h3>
+                    {loading ? (
+                        <div className="flex justify-center py-4">
+                            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : nearbyIncidents.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic text-center py-4">No active incidents nearby</p>
+                    ) : (
+                        nearbyIncidents.map((incident) => (
+                            <div
+                                key={incident.id}
+                                className="card-elevated rounded-xl p-3 shadow-apple border border-border/50 hover:border-primary/30 transition-all"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className={`w-2 h-2 rounded-full ${incident.severity === "high" || incident.severity === "critical" ? "bg-red-500" :
+                                                incident.severity === "medium" || incident.severity === "warning" ? "bg-orange-500" : "bg-yellow-500"
+                                                }`} />
+                                            <h3 className="font-semibold text-sm text-foreground">{incident.type}</h3>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">{incident.location}</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{incident.location}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs font-semibold text-primary">{incident.distance}</p>
-                                    <p className="text-xs text-muted-foreground">{incident.time}</p>
+                                    <div className="text-right">
+                                        <p className="text-xs font-semibold text-primary">{incident.distance}</p>
+                                        <p className="text-xs text-muted-foreground">{incident.time}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -161,3 +236,4 @@ export default function UserHome({ onNavigateToReport, activeIncident }: UserHom
         </div>
     )
 }
+
