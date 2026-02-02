@@ -3,38 +3,28 @@
 import { User, Bell, Shield, MapPin, Clock, Award, Settings, LogOut, ChevronRight, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useMode } from "@/contexts/mode-context"
 
 export default function ProfileView() {
+    const router = useRouter()
     const { theme, setTheme } = useTheme()
     const [mounted, setMounted] = useState(false)
-    const { toggleMode } = useMode()
-    const [tapCount, setTapCount] = useState(0)
-    const [showModeSwitch, setShowModeSwitch] = useState(false)
+    const [currentUser, setCurrentUser] = useState<any>(null)
 
-    // Avoid hydration mismatch
+    // Load current user
     useEffect(() => {
         setMounted(true)
+        const userStr = localStorage.getItem('currentUser')
+        if (userStr) {
+            setCurrentUser(JSON.parse(userStr))
+        }
     }, [])
 
-    // Triple-tap detection
-    const handleVersionTap = () => {
-        setTapCount(prev => prev + 1)
-
-        if (tapCount === 2) {
-            // Third tap
-            setShowModeSwitch(true)
-            setTapCount(0)
-        }
-
-        // Reset tap count after 1 second
-        setTimeout(() => setTapCount(0), 1000)
-    }
-
-    const handleModeSwitch = () => {
-        toggleMode()
-        setShowModeSwitch(false)
+    const handleLogout = () => {
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('currentUser')
+        router.push('/')
     }
 
     const stats = [
@@ -47,7 +37,7 @@ export default function ProfileView() {
         { icon: Bell, label: "Notifications", badge: "3", action: () => { } },
         { icon: Shield, label: "Safety Protocols", action: () => { } },
         { icon: Settings, label: "Settings", action: () => { } },
-        { icon: LogOut, label: "Sign Out", danger: true, action: () => { } },
+        { icon: LogOut, label: "Sign Out", danger: true, action: handleLogout },
     ]
 
     return (
@@ -58,18 +48,18 @@ export default function ProfileView() {
                     <div className="flex items-center gap-4 mb-4">
                         {/* Avatar */}
                         <div className="w-20 h-20 rounded-full bg-primary/20 text-primary ring-4 ring-primary/30 flex items-center justify-center font-bold text-2xl flex-shrink-0 shadow-apple">
-                            JM
+                            {currentUser?.name?.substring(0, 2).toUpperCase() || "??"}
                         </div>
 
                         {/* Info */}
                         <div className="flex-1">
-                            <h1 className="text-2xl font-bold mb-1">James Mitchell</h1>
-                            <p className="text-sm text-muted-foreground mb-1">Security Guard</p>
+                            <h1 className="text-2xl font-bold mb-1">{currentUser?.name || "Loading..."}</h1>
+                            <p className="text-sm text-muted-foreground mb-1">{currentUser?.role === 'responder' ? 'Field Responder' : 'User'}</p>
                             <div className="flex items-center gap-2">
                                 <span className="px-2 py-0.5 bg-success/20 text-success text-xs font-semibold rounded-full">
-                                    On Duty
+                                    {currentUser?.status || 'Active'}
                                 </span>
-                                <span className="text-xs text-muted-foreground font-mono">FR-2847</span>
+                                <span className="text-xs text-muted-foreground font-mono">ID-{currentUser?.id}</span>
                             </div>
                         </div>
                     </div>
@@ -191,42 +181,19 @@ export default function ProfileView() {
                     </div>
                 </div>
 
-                {/* Version Info - Triple Tap to Switch Mode */}
-                <div
-                    onClick={handleVersionTap}
-                    className="text-center text-xs text-muted-foreground py-4 cursor-pointer select-none"
-                >
-                    Field Responder v2.1.0
+                {/* Version Info */}
+                <div className="text-center text-xs text-muted-foreground py-4">
+                    Crisis Management System v2.1.0
                     <br />
                     © 2026 Crisis Management System
+                    {currentUser && (
+                        <>
+                            <br />
+                            <span className="font-mono">Logged in as: {currentUser.username}</span>
+                        </>
+                    )}
                 </div>
             </div>
-
-            {/* Mode Switch Modal */}
-            {showModeSwitch && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="glass-strong rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-border animate-in zoom-in duration-200">
-                        <h2 className="text-xl font-bold mb-2">Switch to User Mode?</h2>
-                        <p className="text-sm text-muted-foreground mb-6">
-                            You'll be switched to the citizen interface for reporting emergencies and viewing alerts.
-                        </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowModeSwitch(false)}
-                                className="flex-1 py-3 rounded-xl font-semibold bg-muted/50 hover:bg-muted transition-all ios-press"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleModeSwitch}
-                                className="flex-1 py-3 rounded-xl font-semibold bg-primary text-primary-foreground shadow-apple transition-all ios-press"
-                            >
-                                Switch Mode
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

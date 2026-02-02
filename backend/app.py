@@ -23,7 +23,9 @@ from routes.alerts import alerts_bp
 from routes.communications import comms_bp
 from routes.analytics import analytics_bp
 from routes.notifications import notifications_bp
+from routes.auth import auth_bp
 
+app.register_blueprint(auth_bp, url_prefix='/api')
 app.register_blueprint(incidents_bp, url_prefix='/api')
 app.register_blueprint(personnel_bp, url_prefix='/api')
 app.register_blueprint(alerts_bp, url_prefix='/api')

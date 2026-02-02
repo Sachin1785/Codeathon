@@ -13,6 +13,23 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Users table for authentication
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            name TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'responder')),
+            email TEXT,
+            phone TEXT,
+            avatar TEXT,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
+        )
+    ''')
+    
     # Incidents table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS incidents (
@@ -75,7 +92,8 @@ def init_db():
             type TEXT DEFAULT 'text',
             read_status BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (incident_id) REFERENCES incidents(id)
+            FOREIGN KEY (incident_id) REFERENCES incidents(id),
+            FOREIGN KEY (sender_id) REFERENCES users(id)
         )
     ''')
     
@@ -167,11 +185,40 @@ def seed_sample_data():
     cursor = conn.cursor()
     
     # Check if data already exists
-    cursor.execute('SELECT COUNT(*) FROM incidents')
+    cursor.execute('SELECT COUNT(*) FROM users')
     if cursor.fetchone()[0] > 0:
         print("⚠️  Database already contains data. Skipping seed.")
         conn.close()
         return
+    
+    # Sample users (3 regular users)
+    # Password is 'password123' for all (in production, use proper hashing!)
+    users = [
+        ('user1', 'password123', 'Command Center Admin', 'user', 'admin@crisis.com', '+91-9876543210'),
+        ('user2', 'password123', 'Operations Manager', 'user', 'ops@crisis.com', '+91-9876543211'),
+        ('user3', 'password123', 'Dispatch Coordinator', 'user', 'dispatch@crisis.com', '+91-9876543212'),
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO users (username, password, name, role, email, phone)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', users)
+    
+    # Sample responders (5 responders)
+    responders = [
+        ('responder1', 'password123', 'Firefighter John', 'responder', 'john@crisis.com', '+91-9876543220'),
+        ('responder2', 'password123', 'Paramedic Sarah', 'responder', 'sarah@crisis.com', '+91-9876543221'),
+        ('responder3', 'password123', 'Officer Mike', 'responder', 'mike@crisis.com', '+91-9876543222'),
+        ('responder4', 'password123', 'Hazmat Specialist Lisa', 'responder', 'lisa@crisis.com', '+91-9876543223'),
+        ('responder5', 'password123', 'EMT David', 'responder', 'david@crisis.com', '+91-9876543224'),
+    ]
+    
+    cursor.executemany('''
+        INSERT INTO users (username, password, name, role, email, phone)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', responders)
+    
+    print(f"✅ Created {len(users)} users and {len(responders)} responders")
     
     # Sample incidents
     incidents = [
