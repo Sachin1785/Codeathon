@@ -255,6 +255,8 @@ def handle_geofence_breach(data):
 @socketio.on('broadcast_message')
 def handle_broadcast_message(data):
     """Handle broadcast message to all responders"""
+    from datetime import datetime
+    
     message = data.get('message')
     sender_name = data.get('sender_name', 'Anonymous')
     sender_id = data.get('sender_id')
@@ -270,6 +272,11 @@ def handle_broadcast_message(data):
         ''', (None, sender_name, message, 'broadcast'))
         
         comm_id = cursor.lastrowid
+        
+        # Get the created timestamp from database
+        cursor.execute('SELECT created_at FROM communications WHERE id = ?', (comm_id,))
+        created_at = cursor.fetchone()[0]
+        
         conn.commit()
         conn.close()
         
@@ -279,7 +286,7 @@ def handle_broadcast_message(data):
             'sender_name': sender_name,
             'sender_id': sender_id,
             'message': message,
-            'timestamp': data.get('timestamp'),
+            'timestamp': created_at,
             'type': 'broadcast'
         })
 

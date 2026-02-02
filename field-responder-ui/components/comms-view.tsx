@@ -12,7 +12,7 @@ export default function CommsView() {
     const [isSending, setIsSending] = useState(false)
     const scrollRef = useRef<HTMLDivElement>(null)
 
-    const { on, emit, isConnected } = useWebSocket({
+    const { on, off, emit, isConnected } = useWebSocket({
         autoConnect: true,
         onConnect: () => {
             console.log('CommsView connected to WebSocket')
@@ -38,21 +38,35 @@ export default function CommsView() {
 
         const handleBroadcastMessage = (data: any) => {
             console.log("Broadcast message received:", data)
-            const newMsg = {
-                id: data.comm_id,
-                sender: data.sender_name,
-                message: data.message,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                type: data.sender_name === 'Responder' ? 'sent' : 'received',
-                status: 'delivered'
-            }
-            setMessages(prev => [...prev, newMsg])
+
+            // Prevent duplicate messages by checking if message already exists
+            setMessages(prev => {
+                const exists = prev.some(msg => msg.id === data.comm_id)
+                if (exists) {
+                    console.log("Message already exists, skipping duplicate")
+                    return prev
+                }
+
+                const newMsg = {
+                    id: data.comm_id,
+                    sender: data.sender_name,
+                    message: data.message,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    type: data.sender_id === 1 ? 'sent' : 'received',
+                    status: 'delivered'
+                }
+                return [...prev, newMsg]
+            })
         }
 
+        // Register listener once when socket connects
         on('broadcast_received', handleBroadcastMessage)
 
-        return () => { }
-    }, [isConnected, on])
+        // Cleanup when socket disconnects or component unmounts
+        return () => {
+            off('broadcast_received', handleBroadcastMessage)
+        }
+    }, [isConnected, on, off]) // Now safe to include since they're memoized
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -73,6 +87,7 @@ export default function CommsView() {
                 sender_id: 1, // Mock ID
                 timestamp: new Date().toISOString()
             })
+
             setPendingMessage("")
         } catch (error) {
             console.error("Error sending message:", error)

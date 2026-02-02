@@ -120,3 +120,28 @@ def get_unread_messages():
         'communications': comms,
         'count': len(comms)
     })
+
+@comms_bp.route('/comms/broadcast', methods=['GET'])
+def get_broadcast_messages():
+    """Get all broadcast messages (messages with no incident_id)"""
+    limit = request.args.get('limit', type=int, default=100)
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT * FROM communications
+        WHERE incident_id IS NULL AND type = 'broadcast'
+        ORDER BY created_at DESC
+        LIMIT ?
+    ''', (limit,))
+    
+    comms = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'communications': comms,
+        'count': len(comms)
+    })
+

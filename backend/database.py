@@ -68,7 +68,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS communications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            incident_id INTEGER NOT NULL,
+            incident_id INTEGER,
             sender_id INTEGER,
             sender_name TEXT,
             message TEXT NOT NULL,

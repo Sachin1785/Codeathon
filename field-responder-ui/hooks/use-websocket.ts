@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
@@ -64,25 +64,26 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         };
     }, [autoConnect]); // Removed callback dependencies
 
-    const emit = (event: string, data: any) => {
+    // Memoize functions to prevent re-renders
+    const emit = useCallback((event: string, data: any) => {
         if (socketRef.current?.connected) {
             socketRef.current.emit(event, data);
         } else {
             console.warn('Socket not connected, cannot emit:', event);
         }
-    };
+    }, []);
 
-    const on = (event: string, callback: (data: any) => void) => {
+    const on = useCallback((event: string, callback: (data: any) => void) => {
         if (socketRef.current) {
             socketRef.current.on(event, callback);
         }
-    };
+    }, []);
 
-    const off = (event: string, callback?: (data: any) => void) => {
+    const off = useCallback((event: string, callback?: (data: any) => void) => {
         if (socketRef.current) {
             socketRef.current.off(event, callback);
         }
-    };
+    }, []);
 
     return {
         socket: socketRef.current,
@@ -92,3 +93,4 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         off,
     };
 }
+
