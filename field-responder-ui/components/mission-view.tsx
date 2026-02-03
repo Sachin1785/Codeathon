@@ -21,21 +21,37 @@ export default function MissionView() {
         victims: false,
     })
     const [missionExpanded, setMissionExpanded] = useState(false)
-    const responderId = 1 // Mock ID
+    const [currentUser, setCurrentUser] = useState<any>(null)
+    const [personnelId, setPersonnelId] = useState<number | null>(null)
 
     const { on, isConnected } = useWebSocket({
         autoConnect: true,
         onConnect: () => console.log('MissionView connected to WebSocket'),
     })
 
+    // Load current user from localStorage
+    useEffect(() => {
+        const userStr = localStorage.getItem('currentUser')
+        if (userStr) {
+            const user = JSON.parse(userStr)
+            setCurrentUser(user)
+        }
+    }, [])
+
     const fetchActiveMission = async () => {
+        if (!currentUser) {
+            setLoading(false)
+            return
+        }
+
         try {
             setLoading(true)
 
-            // 1. Get responder status and assignment
-            const pResponse = await personnelAPI.getById(responderId)
+            // 1. Get responder status and assignment using USER ID
+            const pResponse = await personnelAPI.getByUserId(currentUser.id)
             if (pResponse.success) {
                 const person = pResponse.personnel
+                setPersonnelId(person.id)
 
                 // Map backend status to UI status
                 if (person.status === 'on-scene') setStatus('arrived')
@@ -51,16 +67,22 @@ export default function MissionView() {
                     setActiveIncident(null)
                 }
             }
-        } catch (error) {
-            console.error("Error fetching active mission:", error)
+        } catch (error: any) {
+            // Only log if it's NOT a 404 (404 is expected for new responders without records)
+            if (!error.message?.includes('404')) {
+                console.error("Error fetching active mission:", error)
+            }
+            setActiveIncident(null)
         } finally {
             setLoading(false)
         }
     }
 
     useEffect(() => {
-        fetchActiveMission()
-    }, [])
+        if (currentUser) {
+            fetchActiveMission()
+        }
+    }, [currentUser])
 
     useEffect(() => {
         if (!isConnected) return
@@ -78,13 +100,30 @@ export default function MissionView() {
     }
 
     const handleStatusChange = async (newStatus: "en-route" | "arrived" | "complete") => {
+        let currentPersonnelId = personnelId
+
+        if (!currentPersonnelId && currentUser) {
+            try {
+                const pResponse = await personnelAPI.getByUserId(currentUser.id)
+                if (pResponse.success) {
+                    currentPersonnelId = pResponse.personnel.id
+                    setPersonnelId(currentPersonnelId)
+                }
+            } catch (e) {
+                console.error("Could not find personnel record")
+                return
+            }
+        }
+
+        if (!currentPersonnelId) return
+
         try {
             // Map UI status to backend status
             const backendStatus = newStatus === 'arrived' ? 'on-scene' :
                 newStatus === 'en-route' ? 'en-route' : 'available'
 
             setStatus(newStatus)
-            await personnelAPI.updateStatus(responderId, backendStatus)
+            await personnelAPI.updateStatus(currentPersonnelId, backendStatus)
 
             if (newStatus === 'complete') {
                 // Clear active incident and go back to discovery or show summary
