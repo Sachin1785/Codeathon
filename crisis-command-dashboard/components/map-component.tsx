@@ -13,11 +13,11 @@ interface MapComponentProps {
     status: string
     responders: string[]
   }>
-  selectedIncident: Array<any> | null
+  selectedIncident: any | null
   personnel: Array<{
     id: number
     name: string
-    location: { lat: number; lng: number }
+    location: { lat: number; lng: number } | null
     status: "on-scene" | "en-route" | "available"
     assignedIncident: number | null
     role: string
@@ -94,6 +94,9 @@ export default function MapComponent({ incidents, selectedIncident, personnel }:
     personnelMarkersRef.current = {}
 
     personnel.forEach((person) => {
+      // Skip personnel without location
+      if (!person.location) return;
+
       // Color based on status
       let color = "#3b82f6" // available (blue)
       let statusText = "Available"

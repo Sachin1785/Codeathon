@@ -103,6 +103,10 @@ export const personnelAPI = {
         return fetchAPI(`/personnel/${id}`);
     },
 
+    getByUserId: async (userId: number) => {
+        return fetchAPI(`/personnel/user/${userId}`);
+    },
+
     getAvailable: async () => {
         return fetchAPI('/personnel/available');
     },

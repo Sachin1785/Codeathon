@@ -234,15 +234,47 @@ export default function IncidentsView() {
     async function handleAcceptMission(incidentId: number) {
         try {
             setIsAssigning(true)
-            // Using a mock responder ID (1) for now. In a real app, this would come from auth context.
-            const responderId = 1
-            const response = await personnelAPI.assign(responderId, incidentId)
 
-            if (response.success) {
-                // Refresh list
-                fetchIncidents()
-                // In a real app, we might redirect to the mission view
-                alert("Mission Accepted! Head to the Mission tab for details.")
+            // Get current user from localStorage
+            const userStr = localStorage.getItem('currentUser')
+            if (!userStr) {
+                alert("Please login first")
+                return
+            }
+
+            const currentUser = JSON.parse(userStr)
+
+            // Check if personnel record exists for this user
+            try {
+                // Find personnel record by USER ID
+                let personnelRecord;
+                try {
+                    const pResponse = await personnelAPI.getByUserId(currentUser.id)
+                    if (pResponse.success) {
+                        personnelRecord = pResponse.personnel
+                    }
+                } catch (e) { }
+
+                if (!personnelRecord) {
+                    alert("Personnel record not found. Please contact dispatch to set up your profile.")
+                    setIsAssigning(false)
+                    return
+                }
+
+                const response = await personnelAPI.assign(personnelRecord.id, incidentId)
+
+                if (response.success) {
+                    // Refresh list
+                    fetchIncidents()
+                    alert("Mission Accepted! Head to the Mission tab for details.")
+                }
+            } catch (assignError: any) {
+                // If 404, it means no personnel record exists yet
+                if (assignError.message?.includes('404')) {
+                    alert("Personnel record not found. Please contact dispatch to set up your profile.")
+                } else {
+                    throw assignError
+                }
             }
         } catch (error) {
             console.error("Error accepting mission:", error)

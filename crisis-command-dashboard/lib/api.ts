@@ -3,7 +3,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/a
 // Fetch wrapper with error handling
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -31,7 +31,7 @@ export const incidentsAPI = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.severity) params.append('severity', filters.severity);
     if (filters?.type) params.append('type', filters.type);
-    
+
     const query = params.toString() ? `?${params.toString()}` : '';
     return fetchAPI(`/incidents${query}`);
   },
@@ -96,13 +96,17 @@ export const personnelAPI = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.role) params.append('role', filters.role);
     if (filters?.incident_id) params.append('incident_id', filters.incident_id.toString());
-    
+
     const query = params.toString() ? `?${params.toString()}` : '';
     return fetchAPI(`/personnel${query}`);
   },
 
   getById: async (id: number) => {
     return fetchAPI(`/personnel/${id}`);
+  },
+
+  getByUserId: async (userId: number) => {
+    return fetchAPI(`/personnel/user/${userId}`);
   },
 
   updateLocation: async (id: number, lat: number, lng: number) => {
@@ -122,6 +126,33 @@ export const personnelAPI = {
   getAvailable: async () => {
     return fetchAPI('/personnel/available');
   },
+};
+
+// Auth API
+export const authAPI = {
+  login: async (data: any) => {
+    return fetchAPI('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  logout: async () => {
+    return fetchAPI('/auth/logout', {
+      method: 'POST',
+    });
+  },
+
+  getMe: async () => {
+    return fetchAPI('/auth/me');
+  },
+
+  registerResponder: async (data: any) => {
+    return fetchAPI('/auth/register-responder', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 };
 
 // Communications API

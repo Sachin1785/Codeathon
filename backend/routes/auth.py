@@ -129,6 +129,62 @@ def get_all_users():
         'count': len(users)
     })
 
+@auth_bp.route('/auth/register-responder', methods=['POST'])
+def register_responder():
+    """Register a new responder (User + Personnel record)"""
+    data = request.get_json()
+    
+    required_fields = ['username', 'password', 'name', 'personnel_role']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+            
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Create User
+        cursor.execute('''
+            INSERT INTO users (username, password, name, role, email, phone)
+            VALUES (?, ?, ?, 'responder', ?, ?)
+        ''', (
+            data['username'],
+            data['password'],
+            data['name'],
+            data.get('email'),
+            data.get('phone')
+        ))
+        user_id = cursor.lastrowid
+        
+        # 2. Create Personnel Record
+        cursor.execute('''
+            INSERT INTO personnel (user_id, name, role, status)
+            VALUES (?, ?, ?, 'available')
+        ''', (
+            user_id,
+            data['name'],
+            data['personnel_role']
+        ))
+        personnel_id = cursor.lastrowid
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'user_id': user_id,
+            'personnel_id': personnel_id,
+            'message': 'Responder registered successfully'
+        }), 201
+        
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Username already exists'}), 400
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def verify_token(token):
     """Helper function to verify token"""
     return token in active_sessions

@@ -202,6 +202,42 @@ def update_personnel_status(personnel_id):
     })
 
 
+@personnel_bp.route('/personnel/user/<int:user_id>', methods=['GET'])
+def get_personnel_by_user(user_id):
+    """Get personnel info by user ID"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM personnel WHERE user_id = ?', (user_id,))
+    person = cursor.fetchone()
+    
+    if not person:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Personnel not found for this user'}), 404
+    
+    person = dict(person)
+    
+    # Get assigned incident if any
+    if person['assigned_incident_id']:
+        cursor.execute('SELECT * FROM incidents WHERE id = ?', (person['assigned_incident_id'],))
+        incident = cursor.fetchone()
+        if incident:
+            person['assigned_incident'] = dict(incident)
+    
+    # Format location
+    if person['lat'] and person['lng']:
+        person['location'] = {
+            'lat': person['lat'],
+            'lng': person['lng']
+        }
+    
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'personnel': person
+    })
+
 @personnel_bp.route('/personnel', methods=['POST'])
 def create_personnel():
     """Create new personnel record"""
@@ -215,15 +251,23 @@ def create_personnel():
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Check if user exists if user_id is provided
+    if data.get('user_id'):
+        cursor.execute('SELECT id FROM users WHERE id = ?', (data['user_id'],))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'success': False, 'error': 'Linked user not found'}), 404
+    
     cursor.execute('''
-        INSERT INTO personnel (name, role, status, lat, lng)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO personnel (name, role, status, lat, lng, user_id)
+        VALUES (?, ?, ?, ?, ?, ?)
     ''', (
         data['name'],
         data['role'],
         data.get('status', 'available'),
         data.get('lat'),
-        data.get('lng')
+        data.get('lng'),
+        data.get('user_id')
     ))
     
     personnel_id = cursor.lastrowid
