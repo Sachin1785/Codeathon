@@ -79,6 +79,7 @@ export default function MapComponent({ incidents, selectedIncident, personnel }:
           <div class="font-semibold">${incident.title}</div>
           <div class="text-sm">Status: ${incident.status}</div>
           <div class="text-sm">Personnel: ${incident.responders.length}</div>
+          ${(incident as any).reportCount > 1 ? `<div class="text-sm font-bold text-red-600" style="color: #dc2626; font-weight: bold; margin-top: 4px;">${(incident as any).reportCount} Duplicate Reports</div>` : ""}
         `)
         .addTo(mapRef.current!)
 

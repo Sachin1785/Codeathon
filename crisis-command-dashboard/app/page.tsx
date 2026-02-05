@@ -51,6 +51,7 @@ export default function CrisisCommandDashboard() {
             minute: '2-digit'
           }),
           reportSource: inc.report_source || 'web',
+          reportCount: inc.report_count || 1,
           responders: [],
           resources: [],
           arrivedUnits: 0,
@@ -279,6 +280,11 @@ export default function CrisisCommandDashboard() {
                       <div className="text-xs text-muted-foreground">
                         {incident.responders.length} Personnel • Status:{" "}
                         <span className="text-accent capitalize">{incident.status}</span>
+                        {incident.reportCount > 1 && (
+                          <span className="block mt-1 text-primary font-bold text-[11px]">
+                            {incident.reportCount} Reports Merged
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>

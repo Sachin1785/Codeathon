@@ -15,6 +15,7 @@ interface IncidentDetailViewProps {
     arrivedUnits: number
     totalUnits: number
     reportSource: "voice-call" | "sms" | "bluetooth-mesh"
+    reportCount?: number
   }
 }
 
@@ -60,13 +61,19 @@ export default function IncidentDetailView({ incident }: IncidentDetailViewProps
 
   return (
     <div className="bg-muted/40 rounded-lg border border-border overflow-hidden space-y-3 p-3">
-      {/* Report Source */}
-      <div className="bg-muted/30 rounded p-2 border border-border/50">
+      {/* Report Source & Count */}
+      <div className="bg-muted/30 rounded p-2 border border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs">
           {getReportSourceIcon(incident.reportSource)}
           <span className="text-muted-foreground">Report Source:</span>
           <span className="font-semibold text-foreground">{getReportSourceLabel(incident.reportSource)}</span>
         </div>
+        {(incident.reportCount ?? 1) > 1 && (
+          <div className="flex items-center gap-1.5 bg-background border border-border px-2 py-0.5 rounded text-[10px]">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="font-bold text-foreground">{incident.reportCount} Reports</span>
+          </div>
+        )}
       </div>
 
       {/* Description */}

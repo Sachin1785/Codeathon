@@ -50,7 +50,8 @@ export default function IncidentsView() {
                         time: new Date(inc.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         victims: inc.victims || 0,
                         distance: distanceStr,
-                        severity: inc.description
+                        severity: inc.description,
+                        reportCount: inc.report_count || 1
                     }
                 })
                 setIncidents(formatted)
@@ -196,6 +197,14 @@ export default function IncidentsView() {
                                     <div className="flex items-center gap-2">
                                         <UsersIcon className="w-3.5 h-3.5 text-muted-foreground" />
                                         <span className="text-xs text-muted-foreground">{incident.victims} victims</span>
+                                    </div>
+                                )}
+                                {incident.reportCount > 1 && (
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center justify-center w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold">
+                                            {incident.reportCount}
+                                        </div>
+                                        <span className="text-xs font-medium text-primary">Reports</span>
                                     </div>
                                 )}
                             </div>
