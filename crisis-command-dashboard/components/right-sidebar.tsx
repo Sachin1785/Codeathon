@@ -1,7 +1,10 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Radio, MessageSquare, Wifi, AlertCircle, CheckCircle2, TrendingUp, PieChart } from "lucide-react"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { analyticsAPI } from "@/lib/api"
+import { ResponseTimeWidget } from "@/components/analytics/response-time-widget"
 
 interface RightSidebarProps {
   incidents: Array<{
@@ -10,34 +13,40 @@ interface RightSidebarProps {
     severity: "critical" | "high" | "medium" | "low"
     responders: string[]
     resources: string[]
+    created_at?: string // Added to support time-series
   }>
 }
 
 export default function RightSidebar({ incidents }: RightSidebarProps) {
+  const [loading, setLoading] = useState(true)
+  const [analyticsData, setAnalyticsData] = useState<any>(null)
+
   const systemStatus = {
     voiceCall: { online: true, devices: 3 },
     sms: { online: true, devices: 5 },
     bluetoothMesh: { online: true, devices: 12 },
   }
 
-  // Mock data for incidents over time (last 8 hours)
-  const incidentsOverTime = [
-    { time: "08:00", incidents: 0 },
-    { time: "09:00", incidents: 1 },
-    { time: "10:00", incidents: 2 },
-    { time: "11:00", incidents: 2 },
-    { time: "12:00", incidents: 3 },
-    { time: "13:00", incidents: 3 },
-    { time: "14:00", incidents: 4 },
-    { time: "15:00", incidents: 4 },
-  ]
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true)
+        const response = await analyticsAPI.getDashboard()
+        if (response.success) {
+          setAnalyticsData(response.analytics)
+        }
+      } catch (error) {
+        console.error("Failed to fetch analytics:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const resourceAllocation = [
-    { name: "Fire Units", value: 8 },
-    { name: "Medical", value: 6 },
-    { name: "Hazmat", value: 5 },
-    { name: "Police", value: 4 },
-  ]
+    fetchAnalytics()
+    // Refresh every minute
+    const interval = setInterval(fetchAnalytics, 60000)
+    return () => clearInterval(interval)
+  }, [incidents.length]) // Refresh when incident count changes
 
   const getStatusColor = (isOnline: boolean) => {
     return isOnline ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-500"
@@ -47,11 +56,55 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
     return isOnline ? "bg-green-500/10" : "bg-red-500/10"
   }
 
+  // Format data for charts
+  const resourceAllocation = analyticsData?.resources?.resources_by_type?.map((r: any) => ({
+    name: r.type.charAt(0).toUpperCase() + r.type.slice(1),
+    value: r.count,
+    deployed: r.deployed
+  })) || []
+
+  // Generate Incidents Over Time from actual incident data
+  // Group incidents by hour for the last 12 hours
+  const generateIncidentsOverTime = () => {
+    const hoursMap = new Map<string, number>();
+    const now = new Date();
+    
+    // Initialize last 8 hours with 0
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+      const hourKey = d.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }) + ":00";
+      hoursMap.set(hourKey, 0);
+    }
+
+    // Count incidents (using created_at if available, otherwise defaulting to 'now')
+    incidents.forEach(inc => {
+      if (inc.created_at) {
+        const d = new Date(inc.created_at);
+        const hourKey = d.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }) + ":00";
+        if (hoursMap.has(hourKey)) {
+          hoursMap.set(hourKey, (hoursMap.get(hourKey) || 0) + 1);
+        }
+      }
+    });
+
+    return Array.from(hoursMap.entries()).map(([time, count]) => ({
+      time,
+      incidents: count
+    }));
+  };
+
+  const incidentsOverTime = generateIncidentsOverTime();
+
   return (
-    <>
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border flex-shrink-0">
-        <h2 className="text-sm font-bold text-foreground mb-4">System Dashboard</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold text-foreground">System Dashboard</h2>
+          {analyticsData && (
+             <ResponseTimeWidget avgResponseTime={analyticsData.incidents.avg_response_time_minutes} />
+          )}
+        </div>
 
         {/* System Status */}
         <div className="space-y-2">
@@ -157,20 +210,26 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
             Equipment Allocation
           </h3>
           <div className="bg-muted/30 rounded-lg p-2 border border-border">
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={resourceAllocation} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 0, 255, 0.15)" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--color-muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--color-muted-foreground))" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--color-card))",
-                    border: "1px solid hsl(var(--color-border))",
-                  }}
-                />
-                <Bar dataKey="value" fill="#a855f7" />
-              </BarChart>
-            </ResponsiveContainer>
+            {resourceAllocation.length > 0 ? (
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={resourceAllocation} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(128, 0, 255, 0.15)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "hsl(var(--color-muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--color-muted-foreground))" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--color-card))",
+                      border: "1px solid hsl(var(--color-border))",
+                    }}
+                  />
+                  <Bar dataKey="value" fill="#a855f7" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+               <div className="flex items-center justify-center h-40 text-xs text-muted-foreground">
+                 No resource data available
+               </div>
+            )}
           </div>
         </div>
 
@@ -219,6 +278,6 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { AlertTriangle, BarChart3, MessageSquare, Users } from "lucide-react"
+import { AlertTriangle, BarChart3, MessageSquare, Users, Package } from "lucide-react"
 import IncidentDetailView from "@/components/incident-detail-view"
 import RightSidebar from "@/components/right-sidebar"
 import CommunicationsPanel from "@/components/communications-panel"
 import { PersonnelManagement } from "@/components/personnel-management"
-import { incidentsAPI, personnelAPI } from "@/lib/api"
+import { ResourceManagement } from "@/components/resource-management"
+import { incidentsAPI, personnelAPI, resourcesAPI } from "@/lib/api"
 import { useWebSocket } from "@/hooks/use-websocket"
 
 // Dynamic import for Leaflet map to avoid SSR issues
@@ -26,7 +27,7 @@ export default function CrisisCommandDashboard() {
   const [personnel, setPersonnel] = useState<any[]>([])
   const [expandedIncident, setExpandedIncident] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [rightSidebarView, setRightSidebarView] = useState<'stats' | 'comms' | 'team'>('comms')
+  const [rightSidebarView, setRightSidebarView] = useState<'stats' | 'comms' | 'team' | 'resources'>('comms')
 
   // WebSocket connection
   const { isConnected, on, off, joinIncident, leaveIncident } = useWebSocket({
@@ -60,6 +61,13 @@ export default function CrisisCommandDashboard() {
         setIncidents(currentIncidents)
       }
 
+      // Fetch resources
+      const resourcesResponse = await resourcesAPI.getAll()
+      let currentResources: any[] = []
+      if (resourcesResponse.success) {
+        currentResources = resourcesResponse.resources
+      }
+
       // Fetch personnel
       const personnelResponse = await personnelAPI.getAll()
       if (personnelResponse.success) {
@@ -73,12 +81,15 @@ export default function CrisisCommandDashboard() {
         }))
         setPersonnel(formattedPersonnel)
 
-        // Sync incidents with personnel data
+        // Sync incidents with personnel and resources data
         setIncidents(prev => prev.map((inc: any) => {
           const assignedPersonnel = formattedPersonnel.filter((p: any) => p.assignedIncident === inc.id)
+          const assignedResources = currentResources.filter((r: any) => r.assigned_incident_id === inc.id)
+          
           return {
             ...inc,
             responders: assignedPersonnel.map((p: any) => p.name),
+            resources: assignedResources.map((r: any) => r.name),
             arrivedUnits: assignedPersonnel.filter((p: any) => p.status === 'on-scene').length,
             totalUnits: assignedPersonnel.length,
           }
@@ -90,10 +101,13 @@ export default function CrisisCommandDashboard() {
             // If no incident is selected, select the first one
             const firstIncident = currentIncidents[0];
             const assigned = formattedPersonnel.filter((p: any) => p.assignedIncident === firstIncident.id)
+            const assignedRes = currentResources.filter((r: any) => r.assigned_incident_id === firstIncident.id)
+            
             setExpandedIncident(firstIncident.id) // Also expand the first incident
             return {
               ...firstIncident,
               responders: assigned.map((p: any) => p.name),
+              resources: assignedRes.map((r: any) => r.name),
               arrivedUnits: assigned.filter((p: any) => p.status === 'on-scene').length,
               totalUnits: assigned.length,
             }
@@ -103,9 +117,12 @@ export default function CrisisCommandDashboard() {
             const updated = currentIncidents.find((inc: any) => inc.id === current.id)
             if (updated) {
               const assigned = formattedPersonnel.filter((p: any) => p.assignedIncident === updated.id)
+              const assignedRes = currentResources.filter((r: any) => r.assigned_incident_id === updated.id)
+              
               return {
                 ...updated,
                 responders: assigned.map((p: any) => p.name),
+                resources: assignedRes.map((r: any) => r.name),
                 arrivedUnits: assigned.filter((p: any) => p.status === 'on-scene').length,
                 totalUnits: assigned.length,
               }
@@ -390,6 +407,18 @@ export default function CrisisCommandDashboard() {
               <span className="text-[10px]">Team</span>
             </div>
           </button>
+          <button
+            onClick={() => setRightSidebarView('resources')}
+            className={`flex-1 px-2 py-3 font-medium transition-colors ${rightSidebarView === 'resources'
+              ? 'bg-primary/10 text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:bg-muted/50'
+              }`}
+          >
+            <div className="flex flex-col items-center justify-center gap-1">
+              <Package className="w-4 h-4" />
+              <span className="text-[10px]">Resources</span>
+            </div>
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -398,8 +427,10 @@ export default function CrisisCommandDashboard() {
             <CommunicationsPanel />
           ) : rightSidebarView === 'stats' ? (
             <RightSidebar incidents={incidents} />
-          ) : (
+          ) : rightSidebarView === 'team' ? (
             <PersonnelManagement />
+          ) : (
+            <ResourceManagement incidents={incidents} />
           )}
         </div>
       </div>

@@ -162,10 +162,28 @@ export const notificationsAPI = {
     },
 };
 
+// Resources API
+export const resourcesAPI = {
+    getPublic: async () => {
+        return fetchAPI('/resources/public');
+    },
+
+    getAll: async (filters?: { status?: string; type?: string; is_public?: boolean }) => {
+        const params = new URLSearchParams();
+        if (filters?.status) params.append('status', filters.status);
+        if (filters?.type) params.append('type', filters.type);
+        if (filters?.is_public !== undefined) params.append('is_public', filters.is_public.toString());
+
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return fetchAPI(`/resources${query}`);
+    }
+};
+
 export default {
     incidents: incidentsAPI,
     alerts: alertsAPI,
     personnel: personnelAPI,
     comms: commsAPI,
     notifications: notificationsAPI,
+    resources: resourcesAPI,
 };

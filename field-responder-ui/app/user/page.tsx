@@ -8,6 +8,7 @@ import BottomNav from "@/components/bottom-nav"
 import UserHome from "@/components/user/user-home"
 import ReportIncident from "@/components/user/report-incident"
 import NearbyAlerts from "@/components/user/nearby-alerts"
+import ResourcesView from "@/components/user/resources-view"
 import UserProfile from "@/components/user/user-profile"
 
 export default function UserPage() {
@@ -56,6 +57,8 @@ export default function UserPage() {
                 return <UserHome onNavigateToReport={handleNavigateToReport} activeIncident={activeIncident} />
             case "report":
                 return <ReportIncident preSelectedType={preSelectedType} onSubmit={handleIncidentSubmitted} />
+            case "resources":
+                return <ResourcesView />
             case "alerts":
                 return <NearbyAlerts />
             case "profile":

@@ -259,9 +259,41 @@ export const notificationsAPI = {
   },
 };
 
+// Resources API
+export const resourcesAPI = {
+  getAll: async (filters?: { status?: string; type?: string; is_public?: boolean }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.is_public !== undefined) params.append('is_public', filters.is_public.toString());
+
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchAPI(`/resources${query}`);
+  },
+
+  getAllPublic: async () => {
+    return fetchAPI('/resources/public');
+  },
+
+  create: async (data: any) => {
+    return fetchAPI('/resources', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: number, data: any) => {
+    return fetchAPI(`/resources/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
 export default {
   incidents: incidentsAPI,
   personnel: personnelAPI,
+  resources: resourcesAPI,
   comms: commsAPI,
   analytics: analyticsAPI,
   alerts: alertsAPI,

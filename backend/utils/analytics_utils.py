@@ -180,7 +180,7 @@ def get_resource_utilization():
     total_resources = cursor.fetchone()['total']
     
     # Deployed resources
-    cursor.execute('SELECT COUNT(*) as deployed FROM resources WHERE status = "deployed"')
+    cursor.execute('SELECT COUNT(*) as deployed FROM resources WHERE status = ?', ('deployed',))
     deployed_resources = cursor.fetchone()['deployed']
     
     utilization_rate = (deployed_resources / total_resources * 100) if total_resources > 0 else 0
