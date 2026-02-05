@@ -46,6 +46,7 @@ def init_db():
             reported_by INTEGER,
             victims_count INTEGER DEFAULT 0,
             report_count INTEGER DEFAULT 1,
+            sosmesh_messages TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             resolved_at TIMESTAMP

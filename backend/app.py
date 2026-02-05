@@ -25,6 +25,7 @@ from routes.analytics import analytics_bp
 from routes.notifications import notifications_bp
 from routes.auth import auth_bp
 from routes.resources import resources_bp
+from routes.sos_mesh import sos_mesh_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api')
 app.register_blueprint(incidents_bp, url_prefix='/api')
@@ -34,6 +35,7 @@ app.register_blueprint(comms_bp, url_prefix='/api')
 app.register_blueprint(analytics_bp, url_prefix='/api')
 app.register_blueprint(notifications_bp, url_prefix='/api')
 app.register_blueprint(resources_bp, url_prefix='/api')
+app.register_blueprint(sos_mesh_bp, url_prefix='/api')
 
 
 # Root endpoint
@@ -50,6 +52,7 @@ def index():
             'communications': '/api/comms',
             'analytics': '/api/analytics',
             'notifications': '/api/notifications',
+            'sosmesh': '/api/sosmesh',
             'websocket': 'ws://localhost:5000'
         }
     })
