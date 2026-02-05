@@ -135,6 +135,21 @@ export default function MissionView() {
         }
     }
 
+    const handleResolveIncident = async () => {
+        if (!activeIncident) return
+        
+        try {
+            await incidentsAPI.resolve(activeIncident.id)
+            setActiveIncident(null)
+            setStatus('complete')
+            alert("Incident Resolved! Good job.")
+            // Ideally we should also refresh the personnel status, but setActiveIncident(null) handles the UI view
+        } catch (error) {
+            console.error("Failed to resolve incident:", error)
+            alert("Error resolving incident.")
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -180,7 +195,7 @@ export default function MissionView() {
             <StatusBar status={status} onStatusChange={handleStatusChange} />
 
             {/* Action buttons */}
-            <ActionButtons status={status} onStatusChange={handleStatusChange} />
+            <ActionButtons status={status} onStatusChange={handleStatusChange} onResolve={handleResolveIncident} />
         </div>
     )
 }

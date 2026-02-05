@@ -451,3 +451,69 @@ def add_timeline_event(incident_id):
         'success': True,
         'timeline_id': timeline_id
     }), 201
+
+@incidents_bp.route('/incidents/<int:incident_id>/resolve', methods=['POST'])
+def resolve_incident(incident_id):
+    """Resolve incident and release all assigned resources"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 1. Verify incident exists
+    cursor.execute('SELECT * FROM incidents WHERE id = ?', (incident_id,))
+    incident = cursor.fetchone()
+    if not incident:
+        conn.close()
+        return jsonify({'success': False, 'error': 'Incident not found'}), 404
+        
+    try:
+        # 2. Update Incident Status
+        cursor.execute('''
+            UPDATE incidents 
+            SET status = 'resolved', updated_at = ?
+            WHERE id = ?
+        ''', (datetime.now().isoformat(), incident_id))
+        
+        # 3. Release Personnel
+        cursor.execute('''
+            UPDATE personnel
+            SET status = 'available', assigned_incident_id = NULL, updated_at = ?
+            WHERE assigned_incident_id = ?
+        ''', (datetime.now().isoformat(), incident_id))
+        affected_personnel = cursor.rowcount
+        
+        # 4. Release Resources
+        cursor.execute('''
+            UPDATE resources
+            SET status = 'available', assigned_incident_id = NULL, updated_at = ?
+            WHERE assigned_incident_id = ?
+        ''', (datetime.now().isoformat(), incident_id))
+        affected_resources = cursor.rowcount
+        
+        # 5. Add Timeline Event
+        cursor.execute('''
+            INSERT INTO incident_timeline (incident_id, event_type, description, user_name)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            incident_id, 
+            'incident_resolved', 
+            f'Incident resolved. Released {affected_personnel} personnel and {affected_resources} resources.', 
+            'System'
+        ))
+        
+        conn.commit()
+        
+        # Broadcast update (optional but good practice)
+        # We generally rely on the polling/websocket to pick up status changes
+        
+        return jsonify({
+            'success': True,
+            'message': 'Incident resolved successfully',
+            'released_personnel': affected_personnel,
+            'released_resources': affected_resources
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()

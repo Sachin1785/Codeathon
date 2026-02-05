@@ -54,6 +54,12 @@ export const incidentsAPI = {
         });
     },
 
+    resolve: async (id: number) => {
+        return fetchAPI(`/incidents/${id}/resolve`, {
+            method: 'POST',
+        });
+    },
+
     uploadFile: async (id: number, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -84,6 +90,10 @@ export const alertsAPI = {
             method: 'POST',
             body: JSON.stringify({ lat, lng }),
         });
+    },
+
+    getZones: async (activeOnly = true) => {
+        return fetchAPI(`/alerts/geofence?active_only=${activeOnly}`);
     },
 };
 

@@ -1,17 +1,19 @@
 "use client"
 
-import { Phone, Camera, AlertCircle } from "lucide-react"
+import { Phone, Camera, AlertCircle, CheckCircle } from "lucide-react"
 import { useState } from "react"
 
 interface ActionButtonsProps {
   status?: "en-route" | "arrived" | "complete"
   onStatusChange?: (status: "en-route" | "arrived" | "complete") => void
+  onResolve?: () => void
 }
 
-export default function ActionButtons({ status, onStatusChange }: ActionButtonsProps) {
+export default function ActionButtons({ status, onStatusChange, onResolve }: ActionButtonsProps) {
   const [showToast, setShowToast] = useState<string | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const [isCalling, setIsCalling] = useState(false)
+  const [isResolving, setIsResolving] = useState(false)
 
   const showNotification = (message: string) => {
     setShowToast(message)
@@ -34,9 +36,28 @@ export default function ActionButtons({ status, onStatusChange }: ActionButtonsP
     showNotification("🚨 SOS Alert sent to all nearby units!")
   }
 
+  const handleResolveClick = () => {
+    if (confirm("Are you sure you want to RESOLVE this incident? This will release all responders.")) {
+        setIsResolving(true)
+        showNotification("✅ Resolving incident...")
+        if (onResolve) onResolve()
+        setTimeout(() => setIsResolving(false), 2000)
+    }
+  }
+
   return (
     <>
       <div className="fixed bottom-24 right-4 flex flex-col gap-3 z-[60]">
+        {/* Resolve Incident (Visible if en-route or arrived) */}
+        {(status === 'arrived' || status === 'en-route') && (
+             <button
+              onClick={handleResolveClick}
+              className={`w-16 h-16 rounded-full shadow-apple-lg flex items-center justify-center transition-apple hover:scale-110 ios-press glass-strong border-2 border-success/50 bg-success/20 text-success active:scale-95 ${isResolving ? "animate-pulse" : ""}`}
+            >
+              <CheckCircle className="w-7 h-7" strokeWidth={2.5} />
+            </button>
+        )}
+
         {/* SOS / Emergency */}
         <button
           onClick={handleSOS}
