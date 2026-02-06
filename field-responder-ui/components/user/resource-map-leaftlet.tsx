@@ -87,6 +87,11 @@ export default function ResourceMap({ resources }: ResourceMapProps) {
                         <div className="p-1">
                             <div className="font-bold text-sm mb-1">{res.name}</div>
                             <div className="text-xs text-muted-foreground capitalize mb-1">{res.type.replace('_', ' ')}</div>
+                            {res.distance && (
+                                <div className="text-[10px] font-bold text-primary mb-1">
+                                    {res.distance.toFixed(1)} km away
+                                </div>
+                            )}
                             <div className="text-xs">
                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
                                     res.status === 'deployed' || res.status === 'active' 

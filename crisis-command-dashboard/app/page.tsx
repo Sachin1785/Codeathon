@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { AlertTriangle, BarChart3, MessageSquare, Users, Package, RefreshCw } from "lucide-react"
+import { AlertTriangle, BarChart3, MessageSquare, Users, Package, RefreshCw, Image as ImageIcon } from "lucide-react"
 import IncidentDetailView from "@/components/incident-detail-view"
 import RightSidebar from "@/components/right-sidebar"
 import CommunicationsPanel from "@/components/communications-panel"
 import { PersonnelManagement } from "@/components/personnel-management"
 import { ResourceManagement } from "@/components/resource-management"
+import EvidenceGallery from "@/components/evidence-gallery"
 import { incidentsAPI, personnelAPI, resourcesAPI } from "@/lib/api"
 import { useWebSocket } from "@/hooks/use-websocket"
 
@@ -29,7 +30,7 @@ export default function CrisisCommandDashboard() {
   const [personnel, setPersonnel] = useState<any[]>([])
   const [expandedIncident, setExpandedIncident] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
-  const [rightSidebarView, setRightSidebarView] = useState<'stats' | 'comms' | 'team' | 'resources'>('comms')
+  const [rightSidebarView, setRightSidebarView] = useState<'stats' | 'comms' | 'team' | 'resources' | 'evidence'>('comms')
 
   // WebSocket connection
   const { isConnected, on, off, joinIncident, leaveIncident } = useWebSocket({
@@ -479,6 +480,18 @@ export default function CrisisCommandDashboard() {
               <span className="text-[10px]">Resources</span>
             </div>
           </button>
+          {/* <button
+            onClick={() => setRightSidebarView('evidence')}
+            className={`flex-1 px-2 py-3 font-medium transition-colors ${rightSidebarView === 'evidence'
+              ? 'bg-primary/10 text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:bg-muted/50'
+              }`}
+          >
+            <div className="flex flex-col items-center justify-center gap-1">
+              <ImageIcon className="w-4 h-4" />
+              <span className="text-[10px]">Evidence</span>
+            </div>
+          </button> */}
         </div>
 
         {/* Tab Content */}
@@ -489,8 +502,10 @@ export default function CrisisCommandDashboard() {
             <RightSidebar incidents={allIncidents} />
           ) : rightSidebarView === 'team' ? (
             <PersonnelManagement onSelectPersonnel={handleSelectPersonnel} selectedPersonnelId={selectedPersonnel?.id} />
-          ) : (
+          ) : rightSidebarView === 'resources' ? (
             <ResourceManagement incidents={incidents} />
+          ) : (
+            <EvidenceGallery />
           )}
         </div>
       </div>

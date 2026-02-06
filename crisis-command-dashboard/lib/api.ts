@@ -98,6 +98,10 @@ export const incidentsAPI = {
 
     return await response.json();
   },
+
+  getAllAttachments: async (limit = 100) => {
+    return fetchAPI(`/attachments?limit=${limit}`);
+  },
 };
 
 // Personnel API

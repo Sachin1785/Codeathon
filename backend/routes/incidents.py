@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from database import get_db_connection
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils.file_utils import save_file
 from utils.geo_utils import calculate_distance
 from utils.notification_utils import broadcast_incident_notification
@@ -10,6 +10,31 @@ import threading
 import os
 
 incidents_bp = Blueprint('incidents', __name__)
+
+@incidents_bp.route('/attachments', methods=['GET'])
+def get_all_attachments():
+    """Get all file attachments across all incidents for Evidence Gallery"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    limit = request.args.get('limit', 100)
+    
+    cursor.execute('''
+        SELECT a.*, i.title as incident_title, i.severity as incident_severity
+        FROM attachments a
+        JOIN incidents i ON a.incident_id = i.id
+        ORDER BY a.created_at DESC
+        LIMIT ?
+    ''', (limit,))
+    
+    attachments = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'count': len(attachments),
+        'attachments': attachments
+    })
 
 @incidents_bp.route('/incidents', methods=['GET'])
 def get_incidents():
@@ -161,10 +186,15 @@ def create_incident():
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    # Define severity ranking for upgrades
+    severity_rank = {'critical': 3, 'high': 2, 'medium': 1, 'low': 0}
+    
+    # 1. Search for potential duplicates (Active within last 24 hours)
+    cutoff = (datetime.now() - timedelta(hours=24)).isoformat()
     cursor.execute('''
-        SELECT id, lat, lng, report_count FROM incidents 
-        WHERE type = ? AND status = 'active'
-    ''', (data['type'],))
+        SELECT id, lat, lng, report_count, severity FROM incidents 
+        WHERE type = ? AND status = 'active' AND created_at >= ?
+    ''', (data['type'], cutoff))
     
     active_incidents = [dict(row) for row in cursor.fetchall()]
     
@@ -183,20 +213,38 @@ def create_incident():
         # Increment report count
         new_count = (duplicate_incident['report_count'] or 1) + 1
         now = datetime.now().isoformat()
-        cursor.execute('''
+        
+        # Determine if severity upgrade is needed
+        new_severity = data['severity']
+        old_severity = duplicate_incident['severity']
+        upgrade_needed = severity_rank.get(new_severity, 0) > severity_rank.get(old_severity, 0)
+        
+        update_query = '''
             UPDATE incidents 
             SET report_count = ?, updated_at = ?
-            WHERE id = ?
-        ''', (new_count, now, duplicate_incident['id']))
+        '''
+        update_params = [new_count, now]
         
-        # Add timeline event for duplicate report
+        timeline_desc = f'Additional report received. Total reports: {new_count}'
+        
+        if upgrade_needed:
+            update_query += ', severity = ?'
+            update_params.append(new_severity)
+            timeline_desc += f'. Severity upgraded from {old_severity.upper()} to {new_severity.upper()} based on new report.'
+            
+        update_query += ' WHERE id = ?'
+        update_params.append(duplicate_incident['id'])
+        
+        cursor.execute(update_query, update_params)
+        
+        # Add timeline event for duplicate/merged report
         cursor.execute('''
             INSERT INTO incident_timeline (incident_id, event_type, description, user_name)
             VALUES (?, ?, ?, ?)
         ''', (
             duplicate_incident['id'], 
             'duplicate_report', 
-            f'Additional report received. Total reports: {new_count}', 
+            timeline_desc, 
             'System'
         ))
         
@@ -207,7 +255,8 @@ def create_incident():
             'success': True,
             'incident_id': duplicate_incident['id'],
             'message': 'Report merged with existing incident',
-            'is_duplicate': True
+            'is_duplicate': True,
+            'severity_upgraded': upgrade_needed
         }), 200
 
     now = datetime.now().isoformat()
