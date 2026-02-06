@@ -1,19 +1,34 @@
 "use client"
 
-import { Phone, Camera, AlertCircle, CheckCircle } from "lucide-react"
-import { useState } from "react"
+import { Phone, Camera, AlertCircle, CheckCircle, MapPin, Loader2, X } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { incidentsAPI } from "@/lib/api"
 
 interface ActionButtonsProps {
   status?: "en-route" | "arrived" | "complete"
   onStatusChange?: (status: "en-route" | "arrived" | "complete") => void
   onResolve?: () => void
+  incidentId?: number
 }
 
-export default function ActionButtons({ status, onStatusChange, onResolve }: ActionButtonsProps) {
+export default function ActionButtons({ status, onStatusChange, onResolve, incidentId }: ActionButtonsProps) {
   const [showToast, setShowToast] = useState<string | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const [isCalling, setIsCalling] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null)
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.error("Error getting location", err)
+      )
+    }
+  }, [])
 
   const showNotification = (message: string) => {
     setShowToast(message)
@@ -21,9 +36,33 @@ export default function ActionButtons({ status, onStatusChange, onResolve }: Act
   }
 
   const handleCamera = () => {
-    setIsCapturing(true)
-    showNotification("📸 Evidence captured successfully")
-    setTimeout(() => setIsCapturing(false), 600)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      )
+    }
+    fileInputRef.current?.click()
+  }
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && incidentId) {
+      setIsUploading(true)
+      setIsCapturing(true)
+
+      try {
+        await incidentsAPI.uploadFile(incidentId, file)
+        const locStr = currentLocation ? ` at ${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}` : ""
+        showNotification(`📸 Geo-tagged evidence captured${locStr}`)
+      } catch (error) {
+        console.error("Upload failed", error)
+        showNotification("❌ Failed to upload evidence")
+      } finally {
+        setIsUploading(false)
+        setIsCapturing(false)
+        if (fileInputRef.current) fileInputRef.current.value = ""
+      }
+    }
   }
 
   const handleCall = () => {
@@ -76,12 +115,24 @@ export default function ActionButtons({ status, onStatusChange, onResolve }: Act
         </button>
 
         {/* Log Evidence / Camera */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handlePhotoChange}
+          className="hidden"
+        />
         <button
           onClick={handleCamera}
-          className={`w-16 h-16 rounded-full bg-primary text-primary-foreground shadow-apple-lg flex items-center justify-center transition-apple hover:scale-110 ios-press active:scale-95 ${isCapturing ? "scale-95 brightness-125" : ""
-            }`}
+          disabled={isUploading}
+          className={`w-16 h-16 rounded-full bg-primary text-primary-foreground shadow-apple-lg flex items-center justify-center transition-apple hover:scale-110 ios-press active:scale-95 ${isCapturing ? "scale-95 brightness-125" : ""} ${isUploading ? "opacity-80" : ""}`}
         >
-          <Camera className="w-6 h-6" strokeWidth={2} />
+          {isUploading ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <Camera className="w-6 h-6" strokeWidth={2} />
+          )}
         </button>
       </div>
 

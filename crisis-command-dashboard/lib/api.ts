@@ -9,6 +9,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
         ...options.headers,
       },
     });
@@ -85,6 +86,9 @@ export const incidentsAPI = {
 
     const response = await fetch(`${API_BASE_URL}/incidents/${id}/upload`, {
       method: 'POST',
+      headers: {
+        'ngrok-skip-browser-warning': 'true',
+      },
       body: formData,
     });
 

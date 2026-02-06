@@ -138,7 +138,6 @@ export default function MissionView() {
     const handleResolveIncident = async () => {
         if (!activeIncident) return
         
-        // This is now "Submit for Review"
         try {
             const result = await incidentsAPI.resolve(activeIncident.id)
             if (result.success && result.status === 'pending_review') {
@@ -202,7 +201,12 @@ export default function MissionView() {
             <StatusBar status={status} onStatusChange={handleStatusChange} />
 
             {/* Action buttons */}
-            <ActionButtons status={status} onStatusChange={handleStatusChange} onResolve={handleResolveIncident} />
+            <ActionButtons
+                status={status}
+                onStatusChange={handleStatusChange}
+                onResolve={handleResolveIncident}
+                incidentId={activeIncident?.id}
+            />
         </div>
     )
 }

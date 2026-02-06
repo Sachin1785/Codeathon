@@ -44,6 +44,7 @@ def init_db():
             location_name TEXT,
             report_source TEXT,
             reported_by INTEGER,
+            reporter_phone TEXT,
             victims_count INTEGER DEFAULT 0,
             report_count INTEGER DEFAULT 1,
             sosmesh_messages TEXT,

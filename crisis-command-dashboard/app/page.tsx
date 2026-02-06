@@ -23,6 +23,7 @@ const MapComponent = dynamic(() => import("@/components/map-component"), {
 
 export default function CrisisCommandDashboard() {
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null)
+  const [selectedPersonnel, setSelectedPersonnel] = useState<any | null>(null)
   const [incidents, setIncidents] = useState<any[]>([])
   const [personnel, setPersonnel] = useState<any[]>([])
   const [expandedIncident, setExpandedIncident] = useState<number | null>(null)
@@ -56,6 +57,7 @@ export default function CrisisCommandDashboard() {
             timeZone: 'Asia/Kolkata'
           }),
           reportSource: inc.report_source || 'web',
+          reporterPhone: inc.reporter_phone,
           reportCount: inc.report_count || 1,
           responders: [],
           resources: [],
@@ -89,7 +91,7 @@ export default function CrisisCommandDashboard() {
         setIncidents(prev => prev.map((inc: any) => {
           const assignedPersonnel = formattedPersonnel.filter((p: any) => p.assignedIncident === inc.id)
           const assignedResources = currentResources.filter((r: any) => r.assigned_incident_id === inc.id)
-          
+
           return {
             ...inc,
             responders: assignedPersonnel.map((p: any) => p.name),
@@ -106,7 +108,7 @@ export default function CrisisCommandDashboard() {
             const firstIncident = currentIncidents[0];
             const assigned = formattedPersonnel.filter((p: any) => p.assignedIncident === firstIncident.id)
             const assignedRes = currentResources.filter((r: any) => r.assigned_incident_id === firstIncident.id)
-            
+
             setExpandedIncident(firstIncident.id) // Also expand the first incident
             return {
               ...firstIncident,
@@ -122,7 +124,7 @@ export default function CrisisCommandDashboard() {
             if (updated) {
               const assigned = formattedPersonnel.filter((p: any) => p.assignedIncident === updated.id)
               const assignedRes = currentResources.filter((r: any) => r.assigned_incident_id === updated.id)
-              
+
               return {
                 ...updated,
                 responders: assigned.map((p: any) => p.name),
@@ -218,6 +220,7 @@ export default function CrisisCommandDashboard() {
 
   const handleSelectIncident = (incident: any) => {
     setSelectedIncident(incident)
+    setSelectedPersonnel(null) // Deselect personnel if incident is selected
     setExpandedIncident(expandedIncident === incident.id ? null : incident.id)
   }
 
@@ -388,6 +391,7 @@ export default function CrisisCommandDashboard() {
               <MapComponent
                 incidents={incidents}
                 selectedIncident={selectedIncident}
+                selectedPersonnel={selectedPersonnel}
                 personnel={personnel}
               />
             )}
@@ -456,7 +460,7 @@ export default function CrisisCommandDashboard() {
           ) : rightSidebarView === 'stats' ? (
             <RightSidebar incidents={incidents} />
           ) : rightSidebarView === 'team' ? (
-            <PersonnelManagement />
+            <PersonnelManagement onSelectPersonnel={handleSelectPersonnel} selectedPersonnelId={selectedPersonnel?.id} />
           ) : (
             <ResourceManagement incidents={incidents} />
           )}
