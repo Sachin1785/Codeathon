@@ -82,7 +82,7 @@ export default function ResourcesView() {
     ]
 
     return (
-        <div className="flex flex-col h-full bg-background relative">
+        <div className="flex flex-col h-full bg-background relative pb-20 ">
             {/* Header */}
             <div className="px-4 py-3 border-b border-border bg-background/80 backdrop-blur-md z-10">
                 <h1 className="text-xl font-bold mb-3">Community Resources</h1>
@@ -123,7 +123,7 @@ export default function ResourcesView() {
             </div>
 
             {/* Content (Map or List) */}
-            <div className="flex-1 overflow-hidden relative">
+            <div className="flex-1 overflow-hidden relative m-1">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <Loader2 className="w-8 h-8 animate-spin mb-2" />
@@ -135,12 +135,12 @@ export default function ResourcesView() {
                          
                          {/* Floating List Card for closest resource? OR Toggle */}
                          {/* For now, just the map is enough, markers will show details */}
-                    </div>
-                )}
+                     </div> 
+                 )} 
             </div>
             
             {/* Legend / Info Overlay or Nearest Help Banner */}
-            <div className="absolute bottom-4 left-4 right-4 z-[50]">
+            <div className="relative z-[50] mb-5">
                 {filteredResources.length > 0 && filteredResources[0].distance !== null ? (
                     <div className="bg-primary text-primary-foreground border border-primary/20 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-500">
                         <div className="flex items-center justify-between mb-1">
@@ -154,8 +154,7 @@ export default function ResourcesView() {
                         </div>
                         <h3 className="text-lg font-black leading-tight mb-1">{filteredResources[0].name}</h3>
                         <p className="text-xs font-medium opacity-80 leading-relaxed">
-                            This is your closest {filteredResources[0].type.replace('_', ' ')} point. 
-                            Tap the marker on the map for route information.
+                           
                         </p>
                     </div>
                 ) : (
