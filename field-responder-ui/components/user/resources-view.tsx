@@ -21,9 +21,22 @@ export default function ResourcesView() {
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState("all")
     const [searchQuery, setSearchQuery] = useState("")
-    const [viewMode, setViewMode] = useState<"map" | "list">("map")
+    const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null)
 
     useEffect(() => {
+        // Get user location
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setUserLocation({
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude
+                    })
+                },
+                (err) => console.error("Location access denied", err)
+            )
+        }
+
         const fetchResources = async () => {
             try {
                 setLoading(true)
@@ -40,11 +53,26 @@ export default function ResourcesView() {
         fetchResources()
     }, [])
 
-    const filteredResources = resources.filter(res => {
-        const matchesFilter = filter === "all" || res.type === filter
-        const matchesSearch = res.name.toLowerCase().includes(searchQuery.toLowerCase())
-        return matchesFilter && matchesSearch
+    const { calculateDistance } = require("@/lib/utils")
+
+    const processedResources = resources.map(res => {
+        let distance = null
+        if (userLocation && res.lat && res.lng) {
+            distance = calculateDistance(userLocation.lat, userLocation.lng, res.lat, res.lng)
+        }
+        return { ...res, distance }
     })
+
+    const filteredResources = processedResources
+        .filter(res => {
+            const matchesFilter = filter === "all" || res.type === filter
+            const matchesSearch = res.name.toLowerCase().includes(searchQuery.toLowerCase())
+            return matchesFilter && matchesSearch
+        })
+        .sort((a, b) => {
+            if (a.distance && b.distance) return a.distance - b.distance
+            return 0
+        })
 
     const resourceTypes = [
         { id: "all", label: "All", icon: Filter },
@@ -111,18 +139,39 @@ export default function ResourcesView() {
                 )}
             </div>
             
-            {/* Legend / Info Overlay */}
-            <div className="absolute bottom-4 left-4 right-4 bg-card/90 backdrop-blur border border-border rounded-xl p-3 shadow-lg z-0 pointer-events-none">
-                <div className="flex items-start gap-3">
-                    <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                    <div>
-                        <p className="text-xs font-medium">Public Assistance</p>
-                        <p className="text-[10px] text-muted-foreground">
-                            These resources are verified by Crisis Command. 
-                            Tap a marker for details and directions.
+            {/* Legend / Info Overlay or Nearest Help Banner */}
+            <div className="absolute bottom-4 left-4 right-4 z-[50]">
+                {filteredResources.length > 0 && filteredResources[0].distance !== null ? (
+                    <div className="bg-primary text-primary-foreground border border-primary/20 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom duration-500">
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 fill-primary-foreground/20" />
+                                <span className="text-[10px] font-black uppercase tracking-widest opacity-90">Nearest Assistance</span>
+                            </div>
+                            <span className="text-xs font-black bg-white/20 px-2 py-0.5 rounded-full">
+                                {filteredResources[0].distance.toFixed(1)} KM
+                            </span>
+                        </div>
+                        <h3 className="text-lg font-black leading-tight mb-1">{filteredResources[0].name}</h3>
+                        <p className="text-xs font-medium opacity-80 leading-relaxed">
+                            This is your closest {filteredResources[0].type.replace('_', ' ')} point. 
+                            Tap the marker on the map for route information.
                         </p>
                     </div>
-                </div>
+                ) : (
+                    <div className="bg-card/90 backdrop-blur border border-border rounded-xl p-3 shadow-lg pointer-events-none">
+                        <div className="flex items-start gap-3">
+                            <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-xs font-medium">Public Assistance</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                    These resources are verified by Crisis Command. 
+                                    Tap a marker for details and directions.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
