@@ -9,6 +9,7 @@ import UserHome from "@/components/user/user-home"
 import ReportIncident from "@/components/user/report-incident"
 import NearbyAlerts from "@/components/user/nearby-alerts"
 import ResourcesView from "@/components/user/resources-view"
+import UserProfile from "@/components/user/user-profile"
 import SafetyGuide from "@/components/user/safety-guide"
 
 export default function UserPage() {
