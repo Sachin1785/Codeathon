@@ -14,7 +14,8 @@ interface IncidentDetailViewProps {
     resources: string[]
     arrivedUnits: number
     totalUnits: number
-    reportSource: "voice-call" | "sms" | "bluetooth-mesh"
+    reportSource: "voice-call" | "sms" | "bluetooth-mesh" | "web" | "SMS"
+    reporterPhone?: string
     reportCount?: number
   }
 }
@@ -38,9 +39,12 @@ export default function IncidentDetailView({ incident }: IncidentDetailViewProps
       case "voice-call":
         return <Radio className="w-3 h-3" />
       case "sms":
+      case "SMS":
         return <MessageSquare className="w-3 h-3" />
       case "bluetooth-mesh":
         return <Wifi className="w-3 h-3" />
+      case "web":
+        return <Smartphone className="w-3 h-3" />
       default:
         return <Smartphone className="w-3 h-3" />
     }
@@ -51,27 +55,43 @@ export default function IncidentDetailView({ incident }: IncidentDetailViewProps
       case "voice-call":
         return "Voice Call"
       case "sms":
+      case "SMS":
         return "SMS"
       case "bluetooth-mesh":
         return "Bluetooth Mesh"
+      case "web":
+        return "Dashboard/Web"
       default:
-        return "Unknown"
+        return source || "Unknown"
     }
   }
 
   return (
     <div className="bg-muted/40 rounded-lg border border-border overflow-hidden space-y-3 p-3">
       {/* Report Source & Count */}
-      <div className="bg-muted/30 rounded p-2 border border-border/50 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs">
-          {getReportSourceIcon(incident.reportSource)}
-          <span className="text-muted-foreground">Report Source:</span>
-          <span className="font-semibold text-foreground">{getReportSourceLabel(incident.reportSource)}</span>
+      <div className="bg-muted/30 rounded p-2 border border-border/50 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs">
+            {getReportSourceIcon(incident.reportSource)}
+            <span className="text-muted-foreground">Report Source:</span>
+            <span className="font-semibold text-foreground">{getReportSourceLabel(incident.reportSource)}</span>
+          </div>
+          {(incident.reportCount ?? 1) > 1 && (
+            <div className="flex items-center gap-1.5 bg-background border border-border px-2 py-0.5 rounded text-[10px]">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="font-bold text-foreground">{incident.reportCount} Reports</span>
+            </div>
+          )}
         </div>
-        {(incident.reportCount ?? 1) > 1 && (
-          <div className="flex items-center gap-1.5 bg-background border border-border px-2 py-0.5 rounded text-[10px]">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="font-bold text-foreground">{incident.reportCount} Reports</span>
+
+        {incident.reporterPhone && (
+          <div className="flex items-center justify-between pt-2 border-t border-border/20">
+            <div className="flex items-center gap-2 text-xs">
+              <Smartphone className="w-3 h-3 text-accent" />
+              <span className="text-muted-foreground">Reporter:</span>
+              <span className="font-mono font-bold text-accent">{incident.reporterPhone}</span>
+            </div>
+            <button className="text-[10px] text-accent hover:underline font-semibold">Call Now</button>
           </div>
         )}
       </div>

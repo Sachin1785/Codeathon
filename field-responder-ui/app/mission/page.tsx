@@ -31,7 +31,11 @@ export default function FieldResponderApp() {
         const user = JSON.parse(userStr)
         try {
           const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-          const res = await fetch(`${API_BASE_URL}/personnel/user/${user.id}`)
+          const res = await fetch(`${API_BASE_URL}/personnel/user/${user.id}`, {
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+            },
+          })
           const data = await res.json()
           if (data.success && data.personnel) {
             setPersonnelId(data.personnel.id)

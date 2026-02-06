@@ -43,7 +43,11 @@ export default function ResponderPage() {
             try {
                 // Determine API base URL - ensure it matches what other components use
                 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-                const response = await fetch(`${API_BASE_URL}/personnel/user/${user.id}`);
+                const response = await fetch(`${API_BASE_URL}/personnel/user/${user.id}`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true',
+                    },
+                });
                 const data = await response.json();
                 if (data.success && data.personnel) {
                     setPersonnelId(data.personnel.id);

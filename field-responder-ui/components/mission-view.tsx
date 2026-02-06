@@ -137,7 +137,7 @@ export default function MissionView() {
 
     const handleResolveIncident = async () => {
         if (!activeIncident) return
-        
+
         try {
             await incidentsAPI.resolve(activeIncident.id)
             setActiveIncident(null)
@@ -195,7 +195,12 @@ export default function MissionView() {
             <StatusBar status={status} onStatusChange={handleStatusChange} />
 
             {/* Action buttons */}
-            <ActionButtons status={status} onStatusChange={handleStatusChange} onResolve={handleResolveIncident} />
+            <ActionButtons
+                status={status}
+                onStatusChange={handleStatusChange}
+                onResolve={handleResolveIncident}
+                incidentId={activeIncident?.id}
+            />
         </div>
     )
 }

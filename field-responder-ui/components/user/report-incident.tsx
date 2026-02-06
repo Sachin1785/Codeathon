@@ -15,6 +15,9 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
     const [severity, setSeverity] = useState<"low" | "medium" | "high">("medium")
     const [isAnonymous, setIsAnonymous] = useState(false)
     const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
+    const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+    const [capturedLocation, setCapturedLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [isCapturingLocation, setIsCapturingLocation] = useState(false)
     const [showSuccessPopup, setShowSuccessPopup] = useState(false)
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
     const [locationName, setLocationName] = useState("Getting location...")
@@ -23,26 +26,30 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
 
     // Get user's location on mount
     useEffect(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords
-                    setLocation({ lat: latitude, lng: longitude })
-                    setLocationName(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
-                },
-                (error) => {
-                    console.error("Error getting location:", error)
-                    // Default to Delhi location if geolocation fails
+        getCurrentLocation()
+    }, [])
+
+    const getCurrentLocation = () => {
+        if (!navigator.geolocation) return;
+
+        setIsCapturingLocation(true)
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords
+                setLocation({ lat: latitude, lng: longitude })
+                setLocationName(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+                setIsCapturingLocation(false)
+            },
+            (error) => {
+                console.error("Error getting location:", error)
+                if (!location) {
                     setLocation({ lat: 28.7041, lng: 77.1025 })
                     setLocationName("Delhi, India (Default)")
                 }
-            )
-        } else {
-            // Default location if geolocation not supported
-            setLocation({ lat: 28.7041, lng: 77.1025 })
-            setLocationName("Delhi, India (Default)")
-        }
-    }, [])
+                setIsCapturingLocation(false)
+            }
+        )
+    }
 
     const incidentTypes = [
         { id: "fire", icon: Flame, label: "Fire", color: "bg-red-500" },
@@ -54,6 +61,8 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
     ]
 
     const handlePhotoClick = () => {
+        // Refresh location just before taking photo
+        getCurrentLocation()
         fileInputRef.current?.click()
     }
 
@@ -61,6 +70,14 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
         const file = e.target.files?.[0]
         if (file) {
             setSelectedPhoto(file)
+            setCapturedLocation(location) // Tag with current location
+
+            // Generate preview
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setPhotoPreviewUrl(reader.result as string)
+            }
+            reader.readAsDataURL(file)
         }
     }
 
@@ -114,6 +131,8 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
                     setSeverity("medium")
                     setIsAnonymous(false)
                     setSelectedPhoto(null)
+                    setPhotoPreviewUrl(null)
+                    setCapturedLocation(null)
                     setIsSubmitting(false)
                 }, 3000)
             }
@@ -231,15 +250,55 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
                         onChange={handlePhotoChange}
                         className="hidden"
                     />
-                    <button
-                        onClick={handlePhotoClick}
-                        className="w-full card-elevated rounded-xl p-4 flex items-center justify-center gap-2 hover:bg-muted/50 transition-all ios-press"
-                    >
-                        <Camera className="w-5 h-5 text-primary" />
-                        <span className="text-sm font-semibold text-primary">
-                            {selectedPhoto ? selectedPhoto.name : "Take or Upload Photo"}
-                        </span>
-                    </button>
+
+                    {photoPreviewUrl ? (
+                        <div className="relative group">
+                            <div className="w-full h-48 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-apple-lg bg-muted">
+                                <img src={photoPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+
+                                {/* Geo-tag Overlay */}
+                                <div className="absolute bottom-3 left-3 right-3 glass-strong rounded-xl p-2 flex items-center gap-2 border border-white/20 animate-in slide-in-from-bottom-2 duration-300">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                                        <MapPin className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Geo-Tagged Evidence</p>
+                                        <p className="text-xs font-semibold text-foreground">
+                                            {capturedLocation ? `${capturedLocation.lat.toFixed(6)}, ${capturedLocation.lng.toFixed(6)}` : "Location Pending..."}
+                                        </p>
+                                    </div>
+                                    <div className="px-2 py-0.5 rounded-md bg-success/20 text-[10px] font-bold text-success border border-success/30">
+                                        VERIFIED
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSelectedPhoto(null)
+                                    setPhotoPreviewUrl(null)
+                                    setCapturedLocation(null)
+                                }}
+                                className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-destructive text-white shadow-lg flex items-center justify-center hover:scale-110 active:scale-90 transition-all"
+                            >
+                                <Zap className="w-4 h-4 rotate-45" />
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handlePhotoClick}
+                            className="w-full card-elevated rounded-xl p-6 flex flex-col items-center justify-center gap-3 hover:bg-muted/50 transition-all ios-press border-2 border-dashed border-border group"
+                        >
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-all">
+                                <Camera className="w-6 h-6 text-primary" />
+                            </div>
+                            <div className="text-center">
+                                <p className="text-sm font-bold text-foreground">
+                                    {isCapturingLocation ? "Readying Camera..." : "Take Evidence Photo"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">Photo will be automatically geo-tagged</p>
+                            </div>
+                        </button>
+                    )}
                 </div>
 
                 {/* Anonymous Toggle */}

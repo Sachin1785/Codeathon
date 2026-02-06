@@ -53,6 +53,7 @@ export default function CrisisCommandDashboard() {
             minute: '2-digit'
           }),
           reportSource: inc.report_source || 'web',
+          reporterPhone: inc.reporter_phone,
           reportCount: inc.report_count || 1,
           responders: [],
           resources: [],
