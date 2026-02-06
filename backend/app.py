@@ -14,7 +14,7 @@ Config.init_app(app)
 CORS(app, origins=Config.CORS_ORIGINS, supports_credentials=True)
 
 # Initialize SocketIO for WebSocket support
-socketio = SocketIO(app, cors_allowed_origins=Config.CORS_ORIGINS, async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins=Config.CORS_ORIGINS)
 
 # Import and register blueprints
 from routes.incidents import incidents_bp

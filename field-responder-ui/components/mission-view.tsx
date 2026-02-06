@@ -138,15 +138,22 @@ export default function MissionView() {
     const handleResolveIncident = async () => {
         if (!activeIncident) return
         
+        // This is now "Submit for Review"
         try {
-            await incidentsAPI.resolve(activeIncident.id)
-            setActiveIncident(null)
-            setStatus('complete')
-            alert("Incident Resolved! Good job.")
-            // Ideally we should also refresh the personnel status, but setActiveIncident(null) handles the UI view
+            const result = await incidentsAPI.resolve(activeIncident.id)
+            if (result.success && result.status === 'pending_review') {
+                alert("Submitted for supervisor review. Please wait for confirmation.")
+                // Update local state to show pending UI
+                setActiveIncident((prev: any) => ({ ...prev, status: 'pending_review' }))
+            } else if (result.success) {
+                // If it was auto-resolved (e.g. low severity or config), clear it
+                setActiveIncident(null)
+                setStatus('complete')
+                alert("Incident Resolved!")
+            }
         } catch (error) {
-            console.error("Failed to resolve incident:", error)
-            alert("Error resolving incident.")
+            console.error("Failed to submit resolution:", error)
+            alert("Error submitting resolution.")
         }
     }
 

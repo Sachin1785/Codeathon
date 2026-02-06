@@ -17,9 +17,10 @@ interface IncidentDetailViewProps {
     reportSource: "voice-call" | "sms" | "bluetooth-mesh"
     reportCount?: number
   }
+  onConfirmResolution?: (id: number) => void
 }
 
-export default function IncidentDetailView({ incident }: IncidentDetailViewProps) {
+export default function IncidentDetailView({ incident, onConfirmResolution }: IncidentDetailViewProps) {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "critical":
@@ -75,6 +76,21 @@ export default function IncidentDetailView({ incident }: IncidentDetailViewProps
           </div>
         )}
       </div>
+
+      {/* Confirmation Action */}
+      {incident.status === 'pending_review' && (
+         <div className="bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-center mb-3">
+            <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-1 font-medium">
+               Review Required
+            </p>
+            <button 
+              onClick={() => onConfirmResolution && onConfirmResolution(incident.id)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold py-1.5 px-3 rounded transition-colors"
+            >
+              Confirm Resolution
+            </button>
+         </div>
+      )}
 
       {/* Description */}
       <div>

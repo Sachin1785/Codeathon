@@ -466,6 +466,39 @@ def resolve_incident(incident_id):
         return jsonify({'success': False, 'error': 'Incident not found'}), 404
         
     try:
+        # Check for confirmation flag
+        data = request.get_json() or {}
+        confirm = data.get('confirm', False)
+
+        # If not confirmed, just set to pending_review
+        if not confirm:
+            cursor.execute('''
+                UPDATE incidents 
+                SET status = 'pending_review', updated_at = ?
+                WHERE id = ?
+            ''', (datetime.now().isoformat(), incident_id))
+            
+            # Add Timeline Event
+            cursor.execute('''
+                INSERT INTO incident_timeline (incident_id, event_type, description, user_name)
+                VALUES (?, ?, ?, ?)
+            ''', (
+                incident_id, 
+                'resolution_submitted', 
+                'Incident submitted for resolution. Review required.', 
+                'Responder'
+            ))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Incident submitted for review',
+                'status': 'pending_review',
+                'released_personnel': 0,
+                'released_resources': 0
+            })
+
         # 2. Update Incident Status
         cursor.execute('''
             UPDATE incidents 
@@ -496,8 +529,8 @@ def resolve_incident(incident_id):
         ''', (
             incident_id, 
             'incident_resolved', 
-            f'Incident resolved. Released {affected_personnel} personnel and {affected_resources} resources.', 
-            'System'
+            f'Incident resolution confirmed. Released {affected_personnel} personnel and {affected_resources} resources.', 
+            'Supervisor'
         ))
         
         conn.commit()

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { AlertTriangle, BarChart3, MessageSquare, Users, Package } from "lucide-react"
+import { AlertTriangle, BarChart3, MessageSquare, Users, Package, RefreshCw } from "lucide-react"
 import IncidentDetailView from "@/components/incident-detail-view"
 import RightSidebar from "@/components/right-sidebar"
 import CommunicationsPanel from "@/components/communications-panel"
@@ -44,12 +44,16 @@ export default function CrisisCommandDashboard() {
       let currentIncidents: any[] = []
 
       if (incidentsResponse.success) {
-        currentIncidents = incidentsResponse.incidents.map((inc: any) => ({
+        // Filter out resolved incidents
+        const activeIncidents = incidentsResponse.incidents.filter((inc: any) => inc.status !== 'resolved')
+        
+        currentIncidents = activeIncidents.map((inc: any) => ({
           ...inc,
           location: { lat: inc.lat, lng: inc.lng },
           time: new Date(inc.created_at).toLocaleTimeString('en-US', {
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: 'Asia/Kolkata'
           }),
           reportSource: inc.report_source || 'web',
           reportCount: inc.report_count || 1,
@@ -217,6 +221,18 @@ export default function CrisisCommandDashboard() {
     setExpandedIncident(expandedIncident === incident.id ? null : incident.id)
   }
 
+  const handleConfirmResolution = async (incidentId: number) => {
+      try {
+          if (confirm("Are you sure you want to confirm resolution and release all resources?")) {
+              await incidentsAPI.resolve(incidentId, true)
+              // WebSocket will handle the update refresh
+          }
+      } catch (error) {
+          console.error("Failed to confirm resolution:", error)
+          alert("Failed to confirm resolution")
+      }
+  }
+
   const activePersonnel = personnel.filter(p => p.status !== 'available').length
   const totalEquipment = incidents.reduce((sum, inc) => sum + (inc.resources?.length || 0), 0)
 
@@ -225,9 +241,18 @@ export default function CrisisCommandDashboard() {
       {/* Left Sidebar - Incident List and Details */}
       <div className="w-96 bg-card border-r border-border flex flex-col overflow-hidden">
         <div className="p-4 border-b border-border flex-shrink-0">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">Crisis Command</h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-6 h-6 text-primary" />
+              <h1 className="text-xl font-bold text-foreground">Crisis Command</h1>
+            </div>
+            <button 
+              onClick={() => fetchData()} 
+              className="p-2 hover:bg-muted rounded-full transition-colors"
+              title="Refresh Data"
+            >
+              <RefreshCw className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
           <div className="text-sm text-muted-foreground">{incidents.length} Active Incidents</div>
         </div>
@@ -309,7 +334,10 @@ export default function CrisisCommandDashboard() {
                   {/* Expanded Detail View */}
                   {expandedIncident === incident.id && (
                     <div className="mx-2 mt-2 mb-2">
-                      <IncidentDetailView incident={incident} />
+                      <IncidentDetailView 
+                        incident={incident} 
+                        onConfirmResolution={handleConfirmResolution}
+                      />
                     </div>
                   )}
                 </div>

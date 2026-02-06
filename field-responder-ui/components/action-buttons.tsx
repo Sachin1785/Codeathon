@@ -37,9 +37,9 @@ export default function ActionButtons({ status, onStatusChange, onResolve }: Act
   }
 
   const handleResolveClick = () => {
-    if (confirm("Are you sure you want to RESOLVE this incident? This will release all responders.")) {
+    if (confirm("Submit incident for Supervisor Review? Resources will remain assigned until confirmed.")) {
         setIsResolving(true)
-        showNotification("✅ Resolving incident...")
+        showNotification("✅ Submitting for review...")
         if (onResolve) onResolve()
         setTimeout(() => setIsResolving(false), 2000)
     }
@@ -48,11 +48,11 @@ export default function ActionButtons({ status, onStatusChange, onResolve }: Act
   return (
     <>
       <div className="fixed bottom-24 right-4 flex flex-col gap-3 z-[60]">
-        {/* Resolve Incident (Visible if en-route or arrived) */}
+        {/* Submit for Review (Visible if en-route or arrived) */}
         {(status === 'arrived' || status === 'en-route') && (
              <button
               onClick={handleResolveClick}
-              className={`w-16 h-16 rounded-full shadow-apple-lg flex items-center justify-center transition-apple hover:scale-110 ios-press glass-strong border-2 border-success/50 bg-success/20 text-success active:scale-95 ${isResolving ? "animate-pulse" : ""}`}
+              className={`w-16 h-16 rounded-full shadow-apple-lg flex items-center justify-center transition-apple hover:scale-110 ios-press glass-strong border-2 border-primary/50 bg-primary/20 text-primary active:scale-95 ${isResolving ? "animate-pulse" : ""}`}
             >
               <CheckCircle className="w-7 h-7" strokeWidth={2.5} />
             </button>

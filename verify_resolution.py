@@ -59,9 +59,12 @@ def check_status(name, entity_type, id):
         print(f"   [{name}] Personnel Status: {status}, Assigned Incident: {assigned_id}")
         return status, assigned_id
 
-def resolve_incident(incident_id):
-    print(f"4. Resolving Incident {incident_id}...")
-    res = requests.post(f"{BASE_URL}/incidents/{incident_id}/resolve")
+def resolve_incident(incident_id, confirm=False):
+    action = "Confirming" if confirm else "Submitting"
+    print(f"4. {action} Resolution for Incident {incident_id}...")
+    
+    data = {"confirm": confirm}
+    res = requests.post(f"{BASE_URL}/incidents/{incident_id}/resolve", json=data)
     if res.status_code == 200:
         print(f"   Success! {res.json()['message']}")
         print(f"   Released Personnel: {res.json()['released_personnel']}")
@@ -90,12 +93,31 @@ def run_test():
             print("   ERROR: Assignment failed check.")
             return
 
-        # RESOLVE
-        resolve_incident(incident_id)
+        # 1. SUBMIT FOR REVIEW (Responder Action)
+        print("   Testing Submission (Responder)...")
+        resolve_incident(incident_id, confirm=False)
+
+        # Verify Pending State
+        i_status = check_status("After Submission", "incident", incident_id)
+        p_status, p_incident = check_status("After Submission", "personnel", responder_id)
+
+        if i_status != 'pending_review':
+             print(f"❌ FAILED: Expected incident status 'pending_review', got '{i_status}'")
+             return
+        
+        if p_status == 'available' or p_incident is None:
+             print(f"❌ FAILED: Resources should NOT be released yet. Got {p_status}")
+             return
+
+        print("   ✅ Submission verified. Incident pending, resources still held.")
+
+        # 2. CONFIRM RESOLUTION (Supervisor Action)
+        print("   Testing Confirmation (Supervisor)...")
+        resolve_incident(incident_id, confirm=True)
 
         # Verify Release
-        i_status = check_status("After Resolution", "incident", incident_id)
-        p_status, p_incident = check_status("After Resolution", "personnel", responder_id)
+        i_status = check_status("After Confirmation", "incident", incident_id)
+        p_status, p_incident = check_status("After Confirmation", "personnel", responder_id)
 
         if i_status == 'resolved' and p_status == 'available' and p_incident is None:
             print("\n✅ TEST PASSED: Incident Resolved and Resources Released.")

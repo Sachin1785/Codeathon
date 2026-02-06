@@ -54,6 +54,13 @@ export const incidentsAPI = {
     });
   },
 
+  resolve: async (id: number, confirm: boolean = false) => {
+    return fetchAPI(`/incidents/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ confirm }),
+    });
+  },
+
   assign: async (id: number, data: { personnel_ids?: number[]; resource_ids?: number[] }) => {
     return fetchAPI(`/incidents/${id}/assign`, {
       method: 'POST',
