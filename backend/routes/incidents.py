@@ -4,6 +4,10 @@ from datetime import datetime
 from utils.file_utils import save_file
 from utils.geo_utils import calculate_distance
 from utils.notification_utils import broadcast_incident_notification
+from utils.ai_utils import ai_handler
+from config import Config
+import threading
+import os
 
 incidents_bp = Blueprint('incidents', __name__)
 
@@ -399,7 +403,82 @@ def upload_attachment(incident_id):
     
     attachment_id = cursor.lastrowid
     
-    # Add timeline event
+    # Trigger AI Verification in background if it's an image
+    if file_info['file_type'] == 'image':
+        def run_verification(inc_id, photo_path):
+            incident_type = None
+            incident_desc = None
+            
+            # Step 1: Get incident data and close connection immediately
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT type, description FROM incidents WHERE id = ?', (inc_id,))
+                incident = cursor.fetchone()
+                if incident:
+                    incident_type = incident['type']
+                    incident_desc = incident['description'] or "No description provided"
+            
+            if not incident_type:
+                return
+
+            # Step 2: Call AI (This is the slow part, no DB connection held)
+            print(f"🤖 AI: Starting verification for incident {inc_id}...")
+            result = ai_handler.verify_incident_photo(photo_path, incident_type, incident_desc)
+            
+            # Step 3: Re-open connection to save results (with retry)
+            import time
+            import random
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    with get_db_connection() as conn:
+                        # Explicitly begin transaction
+                        conn.execute('BEGIN IMMEDIATE')
+                        cursor = conn.cursor()
+                        # Update incident with verification results
+                        cursor.execute('''
+                            UPDATE incidents 
+                            SET is_verified = ?, verification_score = ?, ai_analysis = ?, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = ?
+                        ''', (
+                            1 if result['is_verified'] else 0,
+                            result['confidence_score'],
+                            result['analysis'],
+                            inc_id
+                        ))
+                        
+                        # Add timeline event
+                        verification_status = "VERIFIED" if result['is_verified'] else "UNVERIFIED"
+                        cursor.execute('''
+                            INSERT INTO incident_timeline (incident_id, event_type, description, user_name, metadata)
+                            VALUES (?, ?, ?, ?, ?)
+                        ''', (
+                            inc_id,
+                            'ai_verification',
+                            f"AI Verification Result: {verification_status} (Score: {result['confidence_score']}%)",
+                            'Gemini Flash',
+                            result['analysis']
+                        ))
+                        conn.commit()
+                        print(f"✅ AI Verification saved successfully on attempt {attempt + 1}")
+                        break # Success!
+                except Exception as db_err:
+                    # Check if it's a lock error
+                    if 'locked' in str(db_err) and attempt < max_retries - 1:
+                        wait_time = (0.5 * (2 ** attempt)) + (random.random() * 0.2)
+                        print(f"⚠️ DB Locked. Retrying in {wait_time:.2f}s... (Attempt {attempt + 1}/{max_retries})")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"🤖 DB Error saving verification: {db_err}")
+                        break
+            else:
+                print(f"🤖 AI Error: {result.get('error')}")
+
+        # Start verification in a separate thread to not block the response
+        full_photo_path = os.path.join(Config.BASE_DIR, file_info['filepath'])
+        threading.Thread(target=run_verification, args=(incident_id, full_photo_path)).start()
+
+    # Add timeline event for the upload itself
     cursor.execute('''
         INSERT INTO incident_timeline (incident_id, event_type, description, user_name)
         VALUES (?, ?, ?, ?)

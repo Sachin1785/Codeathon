@@ -19,6 +19,9 @@ interface IncidentDetailViewProps {
     reportSource: "voice-call" | "sms" | "bluetooth-mesh" | "web" | "SMS"
     reporterPhone?: string
     reportCount?: number
+    is_verified?: boolean
+    verification_score?: number
+    ai_analysis?: string
   }
   onConfirmResolution?: (id: number) => void
 }
@@ -101,42 +104,67 @@ export default function IncidentDetailView({ incident, onConfirmResolution }: In
 
       {/* Confirmation/Resolution Actions */}
       {incident.status === 'pending_review' && (
-         <div className="bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-center mb-3">
-            <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-1 font-medium italic">
-               Responder has submitted for review
-            </p>
-            <button 
-                onClick={() => onConfirmResolution && onConfirmResolution(incident.id)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold py-1.5 px-3 rounded transition-colors"
-            >
-                Confirm Resolution
-            </button>
-         </div>
+        <div className="bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-center mb-3">
+          <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-1 font-medium italic">
+            Responder has submitted for review
+          </p>
+          <button
+            onClick={() => onConfirmResolution && onConfirmResolution(incident.id)}
+            className="w-full bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold py-1.5 px-3 rounded transition-colors"
+          >
+            Confirm Resolution
+          </button>
+        </div>
+      )}
+
+      {/* AI Verification Status */}
+      {incident.is_verified && (
+        <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded p-2.5 mb-3 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-2 opacity-5">
+            <CheckCircle className="w-16 h-16" />
+          </div>
+          <div className="flex items-start gap-2.5 relative z-10">
+            <div className="bg-blue-500 rounded-full p-1 mt-0.5 shadow-lg shadow-blue-500/20">
+              <CheckCircle className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">AI Verified Incident</h4>
+                <span className="text-[10px] font-mono font-bold bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded">
+                  {incident.verification_score}% Confident
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {incident.ai_analysis || "Visual evidence confirms the reported incident traits."}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Attachments / Evidence */}
       {incident.attachments && incident.attachments.length > 0 && (
-          <div className="mb-3">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Evidence</h4>
-              <div className="grid grid-cols-2 gap-2">
-                  {incident.attachments.map((file: any, idx: number) => {
-                      // Construct URL: strip /api from end of base URL and join with filepath
-                      // If filepath already starts with http, use it as is
-                      const serverUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
-                      const fileUrl = file.filepath.startsWith('http') ? file.filepath : `${serverUrl}/${file.filepath}`;
-                      
-                      return (
-                        <a key={idx} href={fileUrl} target="_blank" rel="noopener noreferrer" className="block relative aspect-video bg-muted rounded overflow-hidden border border-border">
-                            {file.file_type.startsWith('image') ? (
-                                <img src={fileUrl} alt={file.filename} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">{file.filename}</div>
-                            )}
-                        </a>
-                      );
-                  })}
-              </div>
+        <div className="mb-3">
+          <h4 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Evidence</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {incident.attachments.map((file: any, idx: number) => {
+              // Construct URL: strip /api from end of base URL and join with filepath
+              // If filepath already starts with http, use it as is
+              const serverUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+              const fileUrl = file.filepath.startsWith('http') ? file.filepath : `${serverUrl}/${file.filepath}`;
+
+              return (
+                <a key={idx} href={fileUrl} target="_blank" rel="noopener noreferrer" className="block relative aspect-video bg-muted rounded overflow-hidden border border-border">
+                  {file.file_type.startsWith('image') ? (
+                    <img src={fileUrl} alt={file.filename} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-xs text-muted-foreground">{file.filename}</div>
+                  )}
+                </a>
+              );
+            })}
           </div>
+        </div>
       )}
 
       {/* Description */}

@@ -62,7 +62,7 @@ export default function CrisisCommandDashboard() {
 
         // Filter out resolved incidents for the main list and map
         const activeIncidents = fullIncidents.filter((inc: any) => inc.status !== 'resolved')
-        
+
         currentIncidents = activeIncidents.map((inc: any) => ({
           ...inc,
           reportSource: inc.report_source || 'web',
@@ -71,6 +71,9 @@ export default function CrisisCommandDashboard() {
           attachments: inc.attachments || [],
           arrivedUnits: 0,
           totalUnits: 0,
+          is_verified: inc.is_verified,
+          verification_score: inc.verification_score,
+          ai_analysis: inc.ai_analysis
         }))
         setIncidents(currentIncidents)
       }
@@ -250,15 +253,15 @@ export default function CrisisCommandDashboard() {
   }
 
   const handleConfirmResolution = async (incidentId: number) => {
-      try {
-          if (confirm("Are you sure you want to confirm resolution and release all resources?")) {
-              await incidentsAPI.resolve(incidentId, true)
-              // WebSocket will handle the update refresh
-          }
-      } catch (error) {
-          console.error("Failed to confirm resolution:", error)
-          alert("Failed to confirm resolution")
+    try {
+      if (confirm("Are you sure you want to confirm resolution and release all resources?")) {
+        await incidentsAPI.resolve(incidentId, true)
+        // WebSocket will handle the update refresh
       }
+    } catch (error) {
+      console.error("Failed to confirm resolution:", error)
+      alert("Failed to confirm resolution")
+    }
   }
 
   const activePersonnel = personnel.filter(p => p.status !== 'available').length
@@ -274,8 +277,8 @@ export default function CrisisCommandDashboard() {
               <AlertTriangle className="w-6 h-6 text-primary" />
               <h1 className="text-xl font-bold text-foreground">Crisis Command</h1>
             </div>
-            <button 
-              onClick={() => fetchData()} 
+            <button
+              onClick={() => fetchData()}
               className="p-2 hover:bg-muted rounded-full transition-colors"
               title="Refresh Data"
             >
@@ -362,8 +365,8 @@ export default function CrisisCommandDashboard() {
                   {/* Expanded Detail View */}
                   {expandedIncident === incident.id && (
                     <div className="mx-2 mt-2 mb-2">
-                      <IncidentDetailView 
-                        incident={incident} 
+                      <IncidentDetailView
+                        incident={incident}
                         onConfirmResolution={handleConfirmResolution}
                       />
                     </div>
