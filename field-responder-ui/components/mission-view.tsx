@@ -192,8 +192,8 @@ export default function MissionView() {
             <MissionBriefing
                 isExpanded={missionExpanded}
                 onToggle={() => setMissionExpanded(!missionExpanded)}
-                checklist={checklist}
-                onChecklistToggle={handleChecklistToggle}
+                // checklist={checklist}
+                // onChecklistToggle={handleChecklistToggle}
                 incident={activeIncident}
             />
 

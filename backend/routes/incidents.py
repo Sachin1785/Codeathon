@@ -178,11 +178,12 @@ def create_incident():
     if duplicate_incident:
         # Increment report count
         new_count = (duplicate_incident['report_count'] or 1) + 1
+        now = datetime.now().isoformat()
         cursor.execute('''
             UPDATE incidents 
-            SET report_count = ?, updated_at = CURRENT_TIMESTAMP
+            SET report_count = ?, updated_at = ?
             WHERE id = ?
-        ''', (new_count, duplicate_incident['id']))
+        ''', (new_count, now, duplicate_incident['id']))
         
         # Add timeline event for duplicate report
         cursor.execute('''
@@ -205,11 +206,13 @@ def create_incident():
             'is_duplicate': True
         }), 200
 
+    now = datetime.now().isoformat()
     cursor.execute('''
         INSERT INTO incidents (
             title, description, type, severity, status,
-            lat, lng, location_name, report_source, report_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            lat, lng, location_name, report_source, report_count,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ''', (
         data['title'],
         data.get('description', ''),
@@ -219,7 +222,9 @@ def create_incident():
         data['lat'],
         data['lng'],
         data.get('location_name', ''),
-        data.get('report_source', 'web')
+        data.get('report_source', 'web'),
+        now,
+        now
     ))
     
     incident_id = cursor.lastrowid
@@ -276,8 +281,17 @@ def update_incident(incident_id):
         return jsonify({'success': False, 'error': 'No fields to update'}), 400
     
     # Add updated_at
+    now = datetime.now().isoformat()
     update_fields.append('updated_at = ?')
-    params.append(datetime.now().isoformat())
+    params.append(now)
+    
+    # If status is being updated to resolved, set resolved_at
+    if data.get('status') == 'resolved':
+        update_fields.append('resolved_at = ?')
+        params.append(now)
+    elif 'status' in data and data.get('status') != 'resolved':
+        # Optional: Clear resolved_at if status changes away from resolved
+        update_fields.append('resolved_at = NULL')
     
     # Add incident_id for WHERE clause
     params.append(incident_id)
@@ -434,15 +448,17 @@ def add_timeline_event(incident_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    now = datetime.now().isoformat()
     cursor.execute('''
-        INSERT INTO incident_timeline (incident_id, event_type, description, user_name, metadata)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO incident_timeline (incident_id, event_type, description, user_name, metadata, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
     ''', (
         incident_id,
         data['event_type'],
         data['description'],
         data.get('user_name', 'System'),
-        data.get('metadata', '')
+        data.get('metadata', ''),
+        now
     ))
     
     timeline_id = cursor.lastrowid
@@ -474,11 +490,12 @@ def resolve_incident(incident_id):
 
         # If not confirmed, just set to pending_review
         if not confirm:
+            now = datetime.now().isoformat()
             cursor.execute('''
                 UPDATE incidents 
                 SET status = 'pending_review', updated_at = ?
                 WHERE id = ?
-            ''', (datetime.now().isoformat(), incident_id))
+            ''', (now, incident_id))
             
             # Add Timeline Event
             cursor.execute('''
@@ -502,11 +519,12 @@ def resolve_incident(incident_id):
             })
 
         # 2. Update Incident Status
+        now = datetime.now().isoformat()
         cursor.execute('''
             UPDATE incidents 
-            SET status = 'resolved', updated_at = ?
+            SET status = 'resolved', updated_at = ?, resolved_at = ?
             WHERE id = ?
-        ''', (datetime.now().isoformat(), incident_id))
+        ''', (now, now, incident_id))
         
         # 3. Release Personnel
         cursor.execute('''

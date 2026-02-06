@@ -25,6 +25,7 @@ export default function CrisisCommandDashboard() {
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null)
   const [selectedPersonnel, setSelectedPersonnel] = useState<any | null>(null)
   const [incidents, setIncidents] = useState<any[]>([])
+  const [allIncidents, setAllIncidents] = useState<any[]>([])
   const [personnel, setPersonnel] = useState<any[]>([])
   const [expandedIncident, setExpandedIncident] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -43,12 +44,10 @@ export default function CrisisCommandDashboard() {
       // Fetch incidents
       const incidentsResponse = await incidentsAPI.getAll()
       let currentIncidents: any[] = []
+      let fullIncidents: any[] = []
 
       if (incidentsResponse.success) {
-        // Filter out resolved incidents
-        const activeIncidents = incidentsResponse.incidents.filter((inc: any) => inc.status !== 'resolved')
-        
-        currentIncidents = activeIncidents.map((inc: any) => ({
+        fullIncidents = incidentsResponse.incidents.map((inc: any) => ({
           ...inc,
           location: { lat: inc.lat, lng: inc.lng },
           time: new Date(inc.created_at).toLocaleTimeString('en-US', {
@@ -56,11 +55,19 @@ export default function CrisisCommandDashboard() {
             minute: '2-digit',
             timeZone: 'Asia/Kolkata'
           }),
+          responders: [],
+          resources: []
+        }))
+        setAllIncidents(fullIncidents)
+
+        // Filter out resolved incidents for the main list and map
+        const activeIncidents = fullIncidents.filter((inc: any) => inc.status !== 'resolved')
+        
+        currentIncidents = activeIncidents.map((inc: any) => ({
+          ...inc,
           reportSource: inc.report_source || 'web',
           reporterPhone: inc.reporter_phone,
           reportCount: inc.report_count || 1,
-          responders: [],
-          resources: [],
           attachments: inc.attachments || [],
           arrivedUnits: 0,
           totalUnits: 0,
@@ -88,7 +95,7 @@ export default function CrisisCommandDashboard() {
         }))
         setPersonnel(formattedPersonnel)
 
-        // Sync incidents with personnel and resources data
+        // Sync active incidents with personnel and resources data
         setIncidents(prev => prev.map((inc: any) => {
           const assignedPersonnel = formattedPersonnel.filter((p: any) => p.assignedIncident === inc.id)
           const assignedResources = currentResources.filter((r: any) => r.assigned_incident_id === inc.id)
@@ -99,6 +106,18 @@ export default function CrisisCommandDashboard() {
             resources: assignedResources.map((r: any) => r.name),
             arrivedUnits: assignedPersonnel.filter((p: any) => p.status === 'on-scene').length,
             totalUnits: assignedPersonnel.length,
+          }
+        }))
+
+        // Also sync ALL incidents for analytics (to get responder/resource counts if needed)
+        setAllIncidents(prev => prev.map((inc: any) => {
+          const assignedPersonnel = formattedPersonnel.filter((p: any) => p.assignedIncident === inc.id)
+          const assignedResources = currentResources.filter((r: any) => r.assigned_incident_id === inc.id)
+
+          return {
+            ...inc,
+            responders: assignedPersonnel.map((p: any) => p.name),
+            resources: assignedResources.map((r: any) => r.name),
           }
         }))
 
@@ -464,7 +483,7 @@ export default function CrisisCommandDashboard() {
           {rightSidebarView === 'comms' ? (
             <CommunicationsPanel />
           ) : rightSidebarView === 'stats' ? (
-            <RightSidebar incidents={incidents} />
+            <RightSidebar incidents={allIncidents} />
           ) : rightSidebarView === 'team' ? (
             <PersonnelManagement onSelectPersonnel={handleSelectPersonnel} selectedPersonnelId={selectedPersonnel?.id} />
           ) : (

@@ -99,82 +99,81 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-border flex-shrink-0">
+        {/* Overall Health Indicator */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-foreground">System Dashboard</h2>
-          {analyticsData && (
-             <ResponseTimeWidget avgResponseTime={analyticsData.incidents.avg_response_time_minutes} />
-          )}
-        </div>
-
-        {/* System Status */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">System Status</h3>
-
-          {/* Voice Call */}
-          <div className={`rounded p-2 border border-border/50 ${getStatusBg(systemStatus.voiceCall.online)}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Radio className={`w-3 h-3 flex-shrink-0 ${getStatusColor(systemStatus.voiceCall.online)}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground">Voice Call</p>
-                  <p className="text-xs text-muted-foreground">{systemStatus.voiceCall.devices} channels</p>
-                </div>
-              </div>
-              {systemStatus.voiceCall.online ? (
-                <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0" />
-              ) : (
-                <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-500 flex-shrink-0" />
-              )}
-            </div>
-          </div>
-
-          {/* SMS */}
-          <div className={`rounded p-2 border border-border/50 ${getStatusBg(systemStatus.sms.online)}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <MessageSquare className={`w-3 h-3 flex-shrink-0 ${getStatusColor(systemStatus.sms.online)}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground">SMS Gateway</p>
-                  <p className="text-xs text-muted-foreground">{systemStatus.sms.devices} gateways</p>
-                </div>
-              </div>
-              {systemStatus.sms.online ? (
-                <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0" />
-              ) : (
-                <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-500 flex-shrink-0" />
-              )}
-            </div>
-          </div>
-
-          {/* Bluetooth Mesh */}
-          <div className={`rounded p-2 border border-border/50 ${getStatusBg(systemStatus.bluetoothMesh.online)}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Wifi className={`w-3 h-3 flex-shrink-0 ${getStatusColor(systemStatus.bluetoothMesh.online)}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground">Bluetooth Mesh</p>
-                  <p className="text-xs text-muted-foreground">{systemStatus.bluetoothMesh.devices} devices</p>
-                </div>
-              </div>
-              {systemStatus.bluetoothMesh.online ? (
-                <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0" />
-              ) : (
-                <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-500 flex-shrink-0" />
-              )}
-            </div>
-          </div>
-
-          {/* Overall Health */}
-          <div className="mt-2 pt-2 border-t border-border">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Overall Health</span>
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full" />
-                <span className="font-semibold text-green-600 dark:text-green-400">Operational</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" />
+            <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-tight">System Operational</span>
           </div>
         </div>
+
+        {/* System Status - Cleaned up */}
+        <div className="grid grid-cols-1 gap-2 py-2 border-y border-border/50 mb-4 bg-muted/20 -mx-4 px-4">
+          <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+            <div className="flex items-center gap-2">
+              <Radio className={`w-3.5 h-3.5 ${getStatusColor(systemStatus.voiceCall.online)}`} />
+              <span className="text-xs font-semibold">Voice Channels</span>
+            </div>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">{systemStatus.voiceCall.online ? 'Active' : 'Offline'}</span>
+          </div>
+          <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+            <div className="flex items-center gap-2">
+              <MessageSquare className={`w-3.5 h-3.5 ${getStatusColor(systemStatus.sms.online)}`} />
+              <span className="text-xs font-semibold">SMS Gateway</span>
+            </div>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">{systemStatus.sms.online ? 'Online' : 'Error'}</span>
+          </div>
+          <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+            <div className="flex items-center gap-2">
+              <Wifi className={`w-3.5 h-3.5 ${getStatusColor(systemStatus.bluetoothMesh.online)}`} />
+              <span className="text-xs font-semibold">Mesh Network</span>
+            </div>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">{systemStatus.bluetoothMesh.online ? 'Ready' : 'Syncing'}</span>
+          </div>
+        </div>
+
+        {/* Performance Overview Section */}
+        {analyticsData && (
+          <div className="space-y-3">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
+              Incident Performance
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-2">
+              {/* <div className="bg-muted/10 border border-border/40 rounded-xl p-2.5 transition-all hover:bg-muted/20">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Avg Response</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-lg font-bold tracking-tight text-foreground">{analyticsData.incidents.avg_response_time_minutes}</span>
+                  <span className="text-[10px] font-bold text-muted-foreground">MIN</span>
+                </div>
+              </div> */}
+              <div className="bg-muted/10 border border-border/40 rounded-xl p-2.5 transition-all hover:bg-muted/20">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Avg Resolution</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-lg font-bold tracking-tight text-foreground">{analyticsData.incidents.avg_resolution_time_minutes}</span>
+                  <span className="text-[10px] font-bold text-muted-foreground">MIN</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Resolved Incident Breakdown */}
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center justify-between group transition-all hover:bg-primary/10">
+              <div>
+                <p className="text-[10px] font-bold text-primary uppercase mb-0.5 tracking-wider">Resolved</p>
+                <p className="text-xl font-black text-foreground">{analyticsData.incidents.incident_stats.resolved}</p>
+              </div>
+              {/* <div className="text-right">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Efficiency</p>
+                <p className="text-xs font-bold text-success">
+                  {analyticsData.incidents.incident_stats.total > 0 
+                   ? Math.round((analyticsData.incidents.incident_stats.resolved / analyticsData.incidents.incident_stats.total) * 100)
+                   : 0}% Success
+                </p>
+              </div> */}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Scrollable content with graphs */}

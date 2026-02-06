@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Flame, Heart, Shield, AlertTriangle, Car, Zap, MapPin, Camera, Send, CheckCircle } from "lucide-react"
+import { Flame, Heart, Shield, AlertTriangle, Car, Zap, MapPin, Camera, Send, CheckCircle, Loader2 } from "lucide-react"
 import { incidentsAPI } from "@/lib/api"
+import LocationPicker from "./location-picker"
 
 interface ReportIncidentProps {
     preSelectedType?: string
@@ -51,6 +52,9 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
         )
     }
 
+    // Location selection
+    const [showMap, setShowMap] = useState(false)
+
     const incidentTypes = [
         { id: "fire", icon: Flame, label: "Fire", color: "bg-red-500" },
         { id: "medical", icon: Heart, label: "Medical", color: "bg-pink-500" },
@@ -60,9 +64,26 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
         { id: "other", icon: AlertTriangle, label: "Other", color: "bg-orange-500" },
     ]
 
+    const handleLocationChange = (newLoc: { lat: number; lng: number }) => {
+        setLocation(newLoc)
+        setLocationName(`${newLoc.lat.toFixed(6)}, ${newLoc.lng.toFixed(6)}`)
+    }
+
+    const handleManualLatChange = (val: string) => {
+        const lat = parseFloat(val)
+        if (!isNaN(lat) && location) {
+            handleLocationChange({ ...location, lat })
+        }
+    }
+
+    const handleManualLngChange = (val: string) => {
+        const lng = parseFloat(val)
+        if (!isNaN(lng) && location) {
+            handleLocationChange({ ...location, lng })
+        }
+    }
+
     const handlePhotoClick = () => {
-        // Refresh location just before taking photo
-        getCurrentLocation()
         fileInputRef.current?.click()
     }
 
@@ -70,7 +91,7 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
         const file = e.target.files?.[0]
         if (file) {
             setSelectedPhoto(file)
-            setCapturedLocation(location) // Tag with current location
+            setCapturedLocation(location) // Tag with current selected location
 
             // Generate preview
             const reader = new FileReader()
@@ -144,17 +165,17 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
     }
 
     return (
-        <div className="flex flex-col h-full bg-background overflow-y-auto pb-20">
+        <div className="flex flex-col h-full bg-background overflow-y-auto pb-20 scrollbar-hide">
             {/* Header */}
             <div className="gradient-header border-b border-border px-4 py-6">
-                <h1 className="text-2xl font-bold mb-1">Report Incident</h1>
-                <p className="text-sm text-muted-foreground">Help is on the way once you submit</p>
+                <h1 className="text-2xl font-bold mb-1 font-heading tracking-tight">Report Incident</h1>
+                <p className="text-sm text-muted-foreground/80">Help is on the way once you submit</p>
             </div>
 
             <div className="px-4 py-4 space-y-6">
                 {/* Incident Type Selection */}
                 <div>
-                    <label className="text-sm font-bold text-foreground mb-3 block">
+                    <label className="text-sm font-bold text-foreground mb-3 block opacity-80 uppercase tracking-wider">
                         What type of emergency? *
                     </label>
                     <div className="grid grid-cols-3 gap-2">
@@ -166,33 +187,80 @@ export default function ReportIncident({ preSelectedType, onSubmit }: ReportInci
                                     key={type.id}
                                     onClick={() => setSelectedType(type.id)}
                                     className={`
-                    rounded-xl p-4 transition-all duration-300 ios-press
-                    flex flex-col items-center justify-center gap-2
-                    ${isSelected
-                                            ? `${type.color} text-white shadow-apple-lg scale-105`
-                                            : "bg-muted/50 hover:bg-muted text-muted-foreground"
+                                        rounded-2xl p-4 transition-all duration-300 ios-press
+                                        flex flex-col items-center justify-center gap-2
+                                        ${isSelected
+                                            ? `${type.color} text-white shadow-apple-lg scale-105 z-10`
+                                            : "bg-muted/40 hover:bg-muted/60 text-muted-foreground border border-border/50"
                                         }
-                  `}
+                                    `}
                                 >
-                                    <Icon className="w-6 h-6" strokeWidth={2} />
-                                    <span className="text-xs font-semibold">{type.label}</span>
+                                    <Icon className="w-6 h-6" strokeWidth={2.5} />
+                                    <span className="text-[11px] font-bold uppercase tracking-wide">{type.label}</span>
                                 </button>
                             )
                         })}
                     </div>
                 </div>
 
-                {/* Location */}
-                <div>
-                    <label className="text-sm font-bold text-foreground mb-2 block">
-                        Location
-                    </label>
-                    <div className="card-elevated rounded-xl p-3 flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-primary" />
-                        <div className="flex-1">
-                            <p className="text-sm font-medium text-foreground">Current Location</p>
-                            <p className="text-xs text-muted-foreground">{locationName}</p>
+                {/* Enhanced Location Selection */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm font-bold text-foreground opacity-80 uppercase tracking-wider">
+                            Incident Location *
+                        </label>
+                        <button 
+                            onClick={getCurrentLocation}
+                            className="text-[10px] font-bold text-primary flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-full ios-press"
+                        >
+                            <MapPin className="w-3 h-3" /> USE MY GPS
+                        </button>
+                    </div>
+
+                    {/* Manual Entry or Map Selection */}
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-bold text-muted-foreground ml-1">LATITUDE</p>
+                                <input 
+                                    type="number"
+                                    step="0.000001"
+                                    value={location?.lat || ""}
+                                    onChange={(e) => handleManualLatChange(e.target.value)}
+                                    placeholder="e.g. 28.6139"
+                                    className="w-full bg-muted/40 border border-border/50 rounded-xl px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-bold text-muted-foreground ml-1">LONGITUDE</p>
+                                <input 
+                                    type="number"
+                                    step="0.000001"
+                                    value={location?.lng || ""}
+                                    onChange={(e) => handleManualLngChange(e.target.value)}
+                                    placeholder="e.g. 77.2090"
+                                    className="w-full bg-muted/40 border border-border/50 rounded-xl px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
+                                />
+                            </div>
                         </div>
+
+                        {/* Interactive Map Picker */}
+                        <div className="h-[200px] w-full rounded-2xl overflow-hidden border border-border/50 shadow-sm relative group">
+                            {location ? (
+                                <LocationPicker 
+                                    initialLocation={location}
+                                    onChange={handleLocationChange}
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-muted/20 flex flex-col items-center justify-center gap-2">
+                                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                    <p className="text-[10px] font-bold text-muted-foreground">Initializing Location Service...</p>
+                                </div>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground text-center italic">
+                            Tap map or drag pin to adjust location precisely
+                        </p>
                     </div>
                 </div>
 
