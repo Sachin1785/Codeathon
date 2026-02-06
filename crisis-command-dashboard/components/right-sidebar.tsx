@@ -13,7 +13,8 @@ interface RightSidebarProps {
     severity: "critical" | "high" | "medium" | "low"
     responders: string[]
     resources: string[]
-    created_at?: string // Added to support time-series
+    created_at?: string
+    resolved_at?: string
   }>
 }
 
@@ -66,30 +67,43 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
   // Generate Incidents Over Time from actual incident data
   // Group incidents by hour for the last 12 hours
   const generateIncidentsOverTime = () => {
-    const hoursMap = new Map<string, number>();
+    const hoursMap = new Map<string, { created: number; resolved: number }>();
     const now = new Date();
-    
+
     // Initialize last 8 hours with 0
     for (let i = 7; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 60 * 60 * 1000);
       const hourKey = d.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }) + ":00";
-      hoursMap.set(hourKey, 0);
+      hoursMap.set(hourKey, { created: 0, resolved: 0 });
     }
 
-    // Count incidents (using created_at if available, otherwise defaulting to 'now')
+    // Count incidents (using created_at for creation and resolved_at for resolution)
     incidents.forEach(inc => {
+      // Count creations
       if (inc.created_at) {
         const d = new Date(inc.created_at);
         const hourKey = d.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }) + ":00";
         if (hoursMap.has(hourKey)) {
-          hoursMap.set(hourKey, (hoursMap.get(hourKey) || 0) + 1);
+          const current = hoursMap.get(hourKey) || { created: 0, resolved: 0 };
+          hoursMap.set(hourKey, { ...current, created: current.created + 1 });
+        }
+      }
+
+      // Count resolutions
+      if (inc.resolved_at) {
+        const d = new Date(inc.resolved_at);
+        const hourKey = d.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }) + ":00";
+        if (hoursMap.has(hourKey)) {
+          const current = hoursMap.get(hourKey) || { created: 0, resolved: 0 };
+          hoursMap.set(hourKey, { ...current, resolved: current.resolved + 1 });
         }
       }
     });
 
-    return Array.from(hoursMap.entries()).map(([time, count]) => ({
+    return Array.from(hoursMap.entries()).map(([time, counts]) => ({
       time,
-      incidents: count
+      created: counts.created,
+      resolved: counts.resolved
     }));
   };
 
@@ -139,38 +153,9 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
             <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
               Incident Performance
             </h3>
-            
-            <div className="grid grid-cols-1 gap-2">
-              {/* <div className="bg-muted/10 border border-border/40 rounded-xl p-2.5 transition-all hover:bg-muted/20">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Avg Response</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-lg font-bold tracking-tight text-foreground">{analyticsData.incidents.avg_response_time_minutes}</span>
-                  <span className="text-[10px] font-bold text-muted-foreground">MIN</span>
-                </div>
-              </div> */}
-              <div className="bg-muted/10 border border-border/40 rounded-xl p-2.5 transition-all hover:bg-muted/20">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Avg Resolution</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-lg font-bold tracking-tight text-foreground">{analyticsData.incidents.avg_resolution_time_minutes}</span>
-                  <span className="text-[10px] font-bold text-muted-foreground">MIN</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Resolved Incident Breakdown */}
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center justify-between group transition-all hover:bg-primary/10">
-              <div>
-                <p className="text-[10px] font-bold text-primary uppercase mb-0.5 tracking-wider">Resolved</p>
-                <p className="text-xl font-black text-foreground">{analyticsData.incidents.incident_stats.resolved}</p>
-              </div>
-              {/* <div className="text-right">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5">Efficiency</p>
-                <p className="text-xs font-bold text-success">
-                  {analyticsData.incidents.incident_stats.total > 0 
-                   ? Math.round((analyticsData.incidents.incident_stats.resolved / analyticsData.incidents.incident_stats.total) * 100)
-                   : 0}% Success
-                </p>
-              </div> */}
+            <div className="grid grid-cols-1 gap-2">
+              {/* Avg performance metrics can be added here */}
             </div>
           </div>
         )}
@@ -182,7 +167,7 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
             <TrendingUp className="w-3 h-3" />
-            Incidents Over Time
+            Incidents Activity
           </h3>
           <div className="bg-muted/30 rounded-lg p-2 border border-border">
             <ResponsiveContainer width="100%" height={180}>
@@ -196,7 +181,8 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
                     border: "1px solid hsl(var(--color-border))",
                   }}
                 />
-                <Line type="monotone" dataKey="incidents" stroke="#a855f7" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="created" name="New" stroke="#a855f7" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="resolved" name="Resolved" stroke="#22c55e" dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -225,9 +211,9 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-               <div className="flex items-center justify-center h-40 text-xs text-muted-foreground">
-                 No resource data available
-               </div>
+              <div className="flex items-center justify-center h-40 text-xs text-muted-foreground">
+                No resource data available
+              </div>
             )}
           </div>
         </div>
