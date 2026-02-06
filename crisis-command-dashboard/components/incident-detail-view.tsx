@@ -1,6 +1,7 @@
 "use client"
 
-import { Users, Truck, Radio, MessageSquare, Wifi, Smartphone } from "lucide-react"
+import { Users, Truck, Radio, MessageSquare, Wifi, Smartphone, CheckCircle } from "lucide-react"
+import { incidentsAPI } from "@/lib/api"
 
 interface IncidentDetailViewProps {
   incident: {
@@ -12,6 +13,7 @@ interface IncidentDetailViewProps {
     description: string
     responders: string[]
     resources: string[]
+    attachments?: any[]
     arrivedUnits: number
     totalUnits: number
     reportSource: "voice-call" | "sms" | "bluetooth-mesh" | "web" | "SMS"
@@ -97,19 +99,44 @@ export default function IncidentDetailView({ incident, onConfirmResolution }: In
         )}
       </div>
 
-      {/* Confirmation Action */}
+      {/* Confirmation/Resolution Actions */}
       {incident.status === 'pending_review' && (
          <div className="bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-center mb-3">
-            <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-1 font-medium">
-               Review Required
+            <p className="text-[10px] text-yellow-600 dark:text-yellow-400 mb-1 font-medium italic">
+               Responder has submitted for review
             </p>
             <button 
-              onClick={() => onConfirmResolution && onConfirmResolution(incident.id)}
-              className="w-full bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold py-1.5 px-3 rounded transition-colors"
+                onClick={() => onConfirmResolution && onConfirmResolution(incident.id)}
+                className="w-full bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold py-1.5 px-3 rounded transition-colors"
             >
-              Confirm Resolution
+                Confirm Resolution
             </button>
          </div>
+      )}
+
+      {/* Attachments / Evidence */}
+      {incident.attachments && incident.attachments.length > 0 && (
+          <div className="mb-3">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Evidence</h4>
+              <div className="grid grid-cols-2 gap-2">
+                  {incident.attachments.map((file: any, idx: number) => {
+                      // Construct URL: strip /api from end of base URL and join with filepath
+                      // If filepath already starts with http, use it as is
+                      const serverUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
+                      const fileUrl = file.filepath.startsWith('http') ? file.filepath : `${serverUrl}/${file.filepath}`;
+                      
+                      return (
+                        <a key={idx} href={fileUrl} target="_blank" rel="noopener noreferrer" className="block relative aspect-video bg-muted rounded overflow-hidden border border-border">
+                            {file.file_type.startsWith('image') ? (
+                                <img src={fileUrl} alt={file.filename} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">{file.filename}</div>
+                            )}
+                        </a>
+                      );
+                  })}
+              </div>
+          </div>
       )}
 
       {/* Description */}

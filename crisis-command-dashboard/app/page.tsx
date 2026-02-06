@@ -61,6 +61,7 @@ export default function CrisisCommandDashboard() {
           reportCount: inc.report_count || 1,
           responders: [],
           resources: [],
+          attachments: inc.attachments || [],
           arrivedUnits: 0,
           totalUnits: 0,
         }))
@@ -222,6 +223,11 @@ export default function CrisisCommandDashboard() {
     setSelectedIncident(incident)
     setSelectedPersonnel(null) // Deselect personnel if incident is selected
     setExpandedIncident(expandedIncident === incident.id ? null : incident.id)
+  }
+
+  const handleSelectPersonnel = (person: any) => {
+    setSelectedPersonnel(person)
+    setSelectedIncident(null) // Deselect incident if personnel is selected
   }
 
   const handleConfirmResolution = async (incidentId: number) => {

@@ -55,10 +55,10 @@ export const incidentsAPI = {
     });
   },
 
-  resolve: async (id: number, confirm: boolean = false) => {
+  resolve: async (id: number, confirm: boolean = false, reject: boolean = false) => {
     return fetchAPI(`/incidents/${id}/resolve`, {
       method: 'POST',
-      body: JSON.stringify({ confirm }),
+      body: JSON.stringify({ confirm, reject }),
     });
   },
 

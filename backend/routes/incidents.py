@@ -54,12 +54,14 @@ def get_incidents():
         ''', (incident['id'],))
         incident['resources'] = [dict(row) for row in cursor.fetchall()]
         
-        # Get attachments count
+        # Get attachments
         cursor.execute('''
-            SELECT COUNT(*) as count FROM attachments
+            SELECT * FROM attachments
             WHERE incident_id = ?
+            ORDER BY created_at DESC
         ''', (incident['id'],))
-        incident['attachments_count'] = cursor.fetchone()['count']
+        incident['attachments'] = [dict(row) for row in cursor.fetchall()]
+        incident['attachments_count'] = len(incident['attachments'])
         
         # Format location
         incident['location'] = {

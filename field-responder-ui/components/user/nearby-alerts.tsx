@@ -65,7 +65,8 @@ export default function NearbyAlerts() {
             ])
 
             if (incidentsRes.success) {
-                const formattedAlerts = incidentsRes.incidents.map((inc: any) => {
+                const activeIncidents = incidentsRes.incidents.filter((inc: any) => inc.status !== 'resolved' && inc.status !== 'closed')
+                const formattedAlerts = activeIncidents.map((inc: any) => {
                     const distance = userLocation
                         ? calculateDistance(userLocation.lat, userLocation.lng, inc.lat, inc.lng)
                         : null
