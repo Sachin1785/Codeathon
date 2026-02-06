@@ -9,7 +9,7 @@ import UserHome from "@/components/user/user-home"
 import ReportIncident from "@/components/user/report-incident"
 import NearbyAlerts from "@/components/user/nearby-alerts"
 import ResourcesView from "@/components/user/resources-view"
-import UserProfile from "@/components/user/user-profile"
+import SafetyGuide from "@/components/user/safety-guide"
 
 export default function UserPage() {
     const router = useRouter()
@@ -44,6 +44,10 @@ export default function UserPage() {
         setActiveTab("report")
     }
 
+    const handleNavigateToSafety = () => {
+        setActiveTab("safety")
+    }
+
     const handleIncidentSubmitted = (incidentData: any) => {
         // Navigate back to home after a short delay to show the success popup
         setTimeout(() => {
@@ -54,7 +58,7 @@ export default function UserPage() {
     const renderView = () => {
         switch (activeTab) {
             case "home":
-                return <UserHome onNavigateToReport={handleNavigateToReport} activeIncident={activeIncident} />
+                return <UserHome onNavigateToReport={handleNavigateToReport} activeIncident={activeIncident} onNavigateToSafety={handleNavigateToSafety} />
             case "report":
                 return <ReportIncident preSelectedType={preSelectedType} onSubmit={handleIncidentSubmitted} />
             case "resources":
@@ -63,8 +67,10 @@ export default function UserPage() {
                 return <NearbyAlerts />
             case "profile":
                 return <UserProfile />
+            case "safety":
+                return <SafetyGuide onBack={() => setActiveTab("home")} />
             default:
-                return <UserHome onNavigateToReport={handleNavigateToReport} activeIncident={activeIncident} />
+                return <UserHome onNavigateToReport={handleNavigateToReport} activeIncident={activeIncident} onNavigateToSafety={handleNavigateToSafety} />
         }
     }
 

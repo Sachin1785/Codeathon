@@ -32,6 +32,28 @@ export default function CrisisCommandDashboard() {
   const [loading, setLoading] = useState(true)
   const [rightSidebarView, setRightSidebarView] = useState<'stats' | 'comms' | 'team' | 'resources' | 'evidence'>('comms')
 
+  // Resource Location Picker State
+  const [isLocationPickerActive, setIsLocationPickerActive] = useState(false)
+  const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [resources, setResources] = useState<any[]>([])
+
+  const handleActivateLocationPicker = () => {
+    setIsLocationPickerActive(true)
+    setRightSidebarView('resources') // Ensure resource tab is open
+  }
+
+  const handleMapClick = (lat: number, lng: number) => {
+    if (isLocationPickerActive) {
+      setPickedLocation({ lat, lng })
+      setIsLocationPickerActive(false)
+      setRightSidebarView('resources') // Return focus to resource tab
+    } else {
+        // If normal mode, maybe clear selection or do nothing
+        setSelectedIncident(null)
+        setSelectedPersonnel(null)
+    }
+  }
+
   // WebSocket connection
   const { isConnected, on, off, joinIncident, leaveIncident } = useWebSocket({
     autoConnect: true,
@@ -83,7 +105,11 @@ export default function CrisisCommandDashboard() {
       const resourcesResponse = await resourcesAPI.getAll()
       let currentResources: any[] = []
       if (resourcesResponse.success) {
-        currentResources = resourcesResponse.resources
+        currentResources = resourcesResponse.resources.map((r: any) => ({
+          ...r,
+          location: r.lat && r.lng ? { lat: r.lat, lng: r.lng } : null
+        }))
+        setResources(currentResources)
       }
 
       // Fetch personnel
@@ -422,6 +448,9 @@ export default function CrisisCommandDashboard() {
                 selectedIncident={selectedIncident}
                 selectedPersonnel={selectedPersonnel}
                 personnel={personnel}
+                resources={resources}
+                isLocationPickerActive={isLocationPickerActive}
+                onMapClick={handleMapClick}
               />
             )}
           </div>
@@ -480,18 +509,6 @@ export default function CrisisCommandDashboard() {
               <span className="text-[10px]">Resources</span>
             </div>
           </button>
-          {/* <button
-            onClick={() => setRightSidebarView('evidence')}
-            className={`flex-1 px-2 py-3 font-medium transition-colors ${rightSidebarView === 'evidence'
-              ? 'bg-primary/10 text-primary border-b-2 border-primary'
-              : 'text-muted-foreground hover:bg-muted/50'
-              }`}
-          >
-            <div className="flex flex-col items-center justify-center gap-1">
-              <ImageIcon className="w-4 h-4" />
-              <span className="text-[10px]">Evidence</span>
-            </div>
-          </button> */}
         </div>
 
         {/* Tab Content */}
@@ -503,7 +520,12 @@ export default function CrisisCommandDashboard() {
           ) : rightSidebarView === 'team' ? (
             <PersonnelManagement onSelectPersonnel={handleSelectPersonnel} selectedPersonnelId={selectedPersonnel?.id} />
           ) : rightSidebarView === 'resources' ? (
-            <ResourceManagement incidents={incidents} />
+            <ResourceManagement 
+              incidents={incidents} 
+              resources={resources}
+              pickedLocation={pickedLocation}
+              onActivatePicker={handleActivateLocationPicker}
+            />
           ) : (
             <EvidenceGallery />
           )}

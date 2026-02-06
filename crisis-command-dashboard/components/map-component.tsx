@@ -23,12 +23,23 @@ interface MapComponentProps {
     assignedIncident: number | null
     role: string
   }>
+  resources?: Array<{
+    id: number
+    name: string
+    type: string
+    status: string
+    location: { lat: number; lng: number } | null
+    assigned_incident_id?: number
+  }>
+  isLocationPickerActive?: boolean
+  onMapClick?: (lat: number, lng: number) => void
 }
 
-export default function MapComponent({ incidents, selectedIncident, selectedPersonnel, personnel }: MapComponentProps) {
+export default function MapComponent({ incidents, selectedIncident, selectedPersonnel, personnel, resources, isLocationPickerActive, onMapClick }: MapComponentProps) {
   const mapRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Record<number, L.Marker>>({})
   const personnelMarkersRef = useRef<Record<number, L.Marker>>({})
+  const resourceMarkersRef = useRef<Record<number, L.Marker>>({})
 
   const prevSelectedIdRef = useRef<number | null>(null)
   const prevSelectedPersonnelIdRef = useRef<number | null>(null)
@@ -49,6 +60,24 @@ export default function MapComponent({ incidents, selectedIncident, selectedPers
 
       mapInitializedRef.current = true
     }
+
+    // Add cursor style class globally if needed, or handle in the MapEvents
+    if (mapRef.current) {
+        if (isLocationPickerActive) {
+            mapRef.current.getContainer().style.cursor = 'crosshair'
+        } else {
+            mapRef.current.getContainer().style.cursor = ''
+        }
+    }
+    
+    // Click handler for map
+    mapRef.current.off('click')
+    mapRef.current.on('click', (e: L.LeafletMouseEvent) => {
+        if (onMapClick) {
+            onMapClick(e.latlng.lat, e.latlng.lng)
+        }
+    })
+
 
     // Update incident markers
     Object.values(markersRef.current).forEach((marker) => marker.remove())
@@ -174,6 +203,82 @@ export default function MapComponent({ incidents, selectedIncident, selectedPers
       }
     })
 
+    // Update resource markers - RESTORED
+    Object.values(resourceMarkersRef.current).forEach((marker) => marker.remove())
+    resourceMarkersRef.current = {}
+
+    if (resources) {
+        resources.forEach((resource) => {
+        if (!resource.location) return
+
+        let color = "#8b5cf6" // purple for resources
+        let iconChar = "📦" // default package
+
+        // Customize based on type
+        const type = resource.type.toLowerCase()
+        if (type.includes('vehicle') || type.includes('ambulance') || type.includes('truck')) {
+            color = "#ec4899" // pink
+            iconChar = "🚑"
+        } else if (type.includes('medical') || type.includes('kit')) {
+            color = "#ef4444" // red
+            iconChar = "⚕️"
+        } else if (type.includes('food') || type.includes('water')) {
+            color = "#0ea5e9" // sky
+            iconChar = "💧"
+        } else if (type.includes('shelter')) {
+            color = "#f97316" // orange
+            iconChar = "⛺"
+        } else if (type.includes('police')) {
+            color = "#1e40af" // blue
+            iconChar = "👮"
+        }
+
+        const resourceIcon = `
+            <div class="relative group">
+            <div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground px-2 py-1 rounded shadow-md text-[10px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                ${resource.name}
+            </div>
+            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <rect x="6" y="6" width="20" height="20" rx="4" fill="${color}" opacity="0.8" stroke="white" stroke-width="2"/>
+                <text x="16" y="20" font-size="12" text-anchor="middle" fill="white">${iconChar}</text>
+            </svg>
+            </div>
+        `
+
+        const icon = L.divIcon({
+            html: resourceIcon,
+            className: `resource-marker-container`,
+            iconSize: [32, 32] as [number, number],
+            iconAnchor: [16, 16],
+        })
+
+        const marker = L.marker([resource.location.lat, resource.location.lng], {
+            icon,
+            zIndexOffset: 900 // Below personnel, above map
+        })
+            .bindPopup(`
+            <div class="p-2">
+                <div class="font-bold">${resource.name}</div>
+                <div class="text-xs text-muted-foreground mb-1">${resource.type}</div>
+                <div class="flex items-center gap-1 mt-1">
+                <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 capitalize">${resource.status}</span>
+                </div>
+                ${(resource as any).assigned_incident_id ? `<div class="text-[10px] mt-2 border-t pt-1">Assigned to Incident #${(resource as any).assigned_incident_id}</div>` : ""}
+            </div>
+            `)
+            .addTo(mapRef.current!)
+
+        resourceMarkersRef.current[resource.id] = marker
+        })
+    }
+
+    // Fit bounds on first load if we have data
+    if (!mapInitializedRef.current && (incidents.length > 0 || (resources && resources.length > 0))) {
+         // Auto-fit logic could go here, but for now we trust the initial center or user nav
+         // We removed the aggressive auto-fit to avoid jumping, but user can re-enable if desired
+    }
+
+
     // Store current IDs for next iteration
     prevSelectedIdRef.current = selectedIncident?.id || null
     prevSelectedPersonnelIdRef.current = selectedPersonnel?.id || null
@@ -181,7 +286,7 @@ export default function MapComponent({ incidents, selectedIncident, selectedPers
     return () => {
       // Cleanup
     }
-  }, [incidents, selectedIncident, selectedPersonnel, personnel])
+  }, [incidents, selectedIncident, selectedPersonnel, personnel, resources, isLocationPickerActive, onMapClick])
 
   return <div id="map" className="w-full h-full" />
 }

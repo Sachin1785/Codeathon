@@ -5,9 +5,14 @@ import { Truck, Plus, Package, MapPin, Loader2, CheckCircle2, AlertCircle } from
 import { resourcesAPI } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-export function ResourceManagement({ incidents }: { incidents: any[] }) {
-    const [resources, setResources] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+export function ResourceManagement({ incidents, resources, pickedLocation, onActivatePicker }: { 
+    incidents: any[], 
+    resources: any[], 
+    pickedLocation?: { lat: number, lng: number } | null,
+    onActivatePicker?: () => void
+}) {
+    // const [resources, setResources] = useState<any[]>([]) // Managed by parent now
+    const [loading, setLoading] = useState(false)
     const [showAddForm, setShowAddForm] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -27,6 +32,18 @@ export function ResourceManagement({ incidents }: { incidents: any[] }) {
         description: ""
     })
 
+    // Update form when a location is picked from map
+    useEffect(() => {
+        if (pickedLocation) {
+            setFormData(prev => ({
+                ...prev,
+                lat: pickedLocation.lat.toFixed(6),
+                lng: pickedLocation.lng.toFixed(6)
+            }))
+            setShowAddForm(true) // Ensure form is open
+        }
+    }, [pickedLocation])
+/*
     const fetchResources = async () => {
         try {
             setLoading(true)
@@ -44,6 +61,7 @@ export function ResourceManagement({ incidents }: { incidents: any[] }) {
     useEffect(() => {
         fetchResources()
     }, [incidents]) // Refetch when incidents change too, in case assignments change elsewhere? Actually maybe just on mount and updates.
+*/
 
     const handleAddResource = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -71,7 +89,8 @@ export function ResourceManagement({ incidents }: { incidents: any[] }) {
                     description: ""
                 })
                 setShowAddForm(false)
-                fetchResources()
+                setShowAddForm(false)
+                // fetchResources() // Parent will update via websocket or refresh logic eventually, or we could trigger a refresh callback if passed
 
                 // Clear success message after 3 seconds
                 setTimeout(() => setSuccess(null), 3000)
@@ -95,7 +114,9 @@ export function ResourceManagement({ incidents }: { incidents: any[] }) {
             if (response.success) {
                 setSuccess(isUnassigning ? "Resource unassigned" : "Resource assigned to incident")
                 setAssigningId(null)
-                fetchResources()
+                setAssigningId(null)
+                // fetchResources() 
+                setTimeout(() => setSuccess(null), 2000)
                 setTimeout(() => setSuccess(null), 2000)
             }
         } catch (error) {
@@ -230,14 +251,25 @@ export function ResourceManagement({ incidents }: { incidents: any[] }) {
                             </div>
                         </div>
                         
-                        <button 
-                            type="button" 
-                            onClick={getLocation}
-                            className="text-xs text-primary font-bold flex items-center gap-1 hover:underline"
-                        >
-                            <MapPin className="w-3 h-3" />
-                            Get Current Location
-                        </button>
+                        <div className="flex items-center justify-between">
+                            <button 
+                                type="button" 
+                                onClick={getLocation}
+                                className="text-xs text-primary font-bold flex items-center gap-1 hover:underline"
+                            >
+                                <MapPin className="w-3 h-3" />
+                                Get Current Location
+                            </button>
+                            
+                            <button 
+                                type="button" 
+                                onClick={onActivatePicker}
+                                className="text-xs text-accent font-bold flex items-center gap-1 hover:underline"
+                            >
+                                <MapPin className="w-3 h-3" />
+                                📍 Pick on Map
+                            </button>
+                        </div>
 
                         <div className="flex items-center gap-2 py-1">
                             <input 
@@ -306,22 +338,22 @@ export function ResourceManagement({ incidents }: { incidents: any[] }) {
                                         </div>
                                         <div>
                                             <div className="font-semibold text-sm">{resource.name}</div>
-                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                                <span className="capitalize">{resource.type}</span>
-                                                <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                                                    {resource.type}
+                                                </span>
                                                 <span className={cn(
-                                                    "capitalize",
-                                                    resource.status === 'active' || resource.status === 'deployed' ? "text-success" :
-                                                        resource.status === 'maintenance' ? "text-destructive" :
-                                                            "text-blue-500"
+                                                    "text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border",
+                                                    (resource.status === 'active' || resource.status === 'deployed' || resource.status === 'available') ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800" :
+                                                    resource.status === 'maintenance' ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800" :
+                                                    "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
                                                 )}>
                                                     {resource.status}
                                                 </span>
                                                 {resource.is_public && (
-                                                <>
-                                                    <span className="w-1 h-1 bg-muted-foreground/30 rounded-full" />
-                                                    <span className="text-xs text-blue-400 font-bold">Public</span>
-                                                </>
+                                                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800">
+                                                        Public
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
