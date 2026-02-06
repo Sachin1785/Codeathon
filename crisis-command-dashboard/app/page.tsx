@@ -276,7 +276,7 @@ export default function CrisisCommandDashboard() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-bold text-foreground">Crisis Command</h1>
+              <h1 className="text-xl font-bold text-foreground">ResQnet Command</h1>
             </div>
             <button
               onClick={() => fetchData()}

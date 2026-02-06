@@ -8,7 +8,7 @@ import { PWARegister } from "@/components/pwa-register"
 import type { Viewport } from "next"
 
 export const metadata: Metadata = {
-  title: "Field Responder - Crisis Management",
+  title: "Field Responder - ResQnet",
   description: "Modern tactical field response platform",
   generator: "v0.app",
   manifest: "/manifest.json",
