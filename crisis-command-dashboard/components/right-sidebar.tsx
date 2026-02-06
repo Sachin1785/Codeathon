@@ -124,13 +124,13 @@ export default function RightSidebar({ incidents }: RightSidebarProps) {
 
         {/* System Status - Cleaned up */}
         <div className="grid grid-cols-1 gap-2 py-2 border-y border-border/50 mb-4 bg-muted/20 -mx-4 px-4">
-          <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+          {/* <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
             <div className="flex items-center gap-2">
               <Radio className={`w-3.5 h-3.5 ${getStatusColor(systemStatus.voiceCall.online)}`} />
               <span className="text-xs font-semibold">Voice Channels</span>
             </div>
             <span className="text-[10px] font-bold text-muted-foreground uppercase">{systemStatus.voiceCall.online ? 'Active' : 'Offline'}</span>
-          </div>
+          </div> */}
           <div className="flex items-center justify-between p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
             <div className="flex items-center gap-2">
               <MessageSquare className={`w-3.5 h-3.5 ${getStatusColor(systemStatus.sms.online)}`} />

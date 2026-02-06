@@ -1,6 +1,6 @@
 "use client"
 
-import { Users, Truck, Radio, MessageSquare, Wifi, Smartphone, CheckCircle } from "lucide-react"
+import { Users, Truck, Radio, MessageSquare, Wifi, Smartphone, CheckCircle, AlertCircle } from "lucide-react"
 import { incidentsAPI } from "@/lib/api"
 
 interface IncidentDetailViewProps {
@@ -19,7 +19,7 @@ interface IncidentDetailViewProps {
     reportSource: "voice-call" | "sms" | "bluetooth-mesh" | "web" | "SMS"
     reporterPhone?: string
     reportCount?: number
-    is_verified?: boolean
+    is_verified?: number
     verification_score?: number
     ai_analysis?: string
   }
@@ -118,7 +118,7 @@ export default function IncidentDetailView({ incident, onConfirmResolution }: In
       )}
 
       {/* AI Verification Status */}
-      {incident.is_verified && (
+      {incident.is_verified === 1 && (
         <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded p-2.5 mb-3 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-2 opacity-5">
             <CheckCircle className="w-16 h-16" />
@@ -136,6 +136,30 @@ export default function IncidentDetailView({ incident, onConfirmResolution }: In
               </div>
               <p className="text-[11px] text-muted-foreground leading-snug">
                 {incident.ai_analysis || "Visual evidence confirms the reported incident traits."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {incident.is_verified === -1 && (
+        <div className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-red-500/20 rounded p-2.5 mb-3 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-2 opacity-5">
+            <AlertCircle className="w-16 h-16 text-red-500" />
+          </div>
+          <div className="flex items-start gap-2.5 relative z-10">
+            <div className="bg-red-500 rounded-full p-1 mt-0.5 shadow-lg shadow-red-500/20">
+              <AlertCircle className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wide">Potential Fake Report</h4>
+                <span className="text-[10px] font-mono font-bold bg-red-500/20 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded">
+                  Flagged by AI
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {incident.ai_analysis || "The uploaded image does not match the report or looks suspicious."}
               </p>
             </div>
           </div>

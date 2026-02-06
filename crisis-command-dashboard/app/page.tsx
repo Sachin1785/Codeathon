@@ -315,24 +315,6 @@ export default function CrisisCommandDashboard() {
           <div className="text-sm text-muted-foreground">{incidents.length} Active Incidents</div>
         </div>
 
-        {/* Top Stats Bar in sidebar */}
-        <div className="px-4 py-3 bg-muted/20 border-b border-border flex-shrink-0">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-muted/50 rounded p-2">
-              <div className="text-xs text-muted-foreground">Personnel</div>
-              <div className="text-lg font-bold text-accent">
-                {activePersonnel}
-              </div>
-            </div>
-            <div className="bg-muted/50 rounded p-2">
-              <div className="text-xs text-muted-foreground">Equipment</div>
-              <div className="text-lg font-bold text-accent">
-                {totalEquipment}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Incident List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (

@@ -41,13 +41,15 @@ class AIHandler:
 
             Please analyze the image and provide:
             1. 'is_verified': true/false (Does the image clearly show evidence of the reported incident?)
-            2. 'confidence_score': 0-100 (How confident are you in this assessment?)
-            3. 'analysis': A brief (1-2 sentence) explanation of what you see.
-            4. 'severity_estimate': low/medium/high/critical based on visual evidence.
+            2. 'is_fake': true/false (Does this look like a prank, stock photo, AI-generated, or an image intentionally uploaded to deceive? Use true if it's completely unrelated to an emergency.)
+            3. 'confidence_score': 0-100 (How confident are you in this assessment?)
+            4. 'analysis': A brief (1-2 sentence) explanation of what you see.
+            5. 'severity_estimate': low/medium/high/critical based on visual evidence.
 
             Respond ONLY in JSON format like this:
             {{
                 "is_verified": true,
+                "is_fake": false,
                 "confidence_score": 95,
                 "analysis": "Visible smoke and flames in a residential area.",
                 "severity_estimate": "high"
@@ -65,9 +67,17 @@ class AIHandler:
             match = re.search(r'\{.*\}', text, re.DOTALL)
             if match:
                 result = json.loads(match.group())
+                
+                # Determine integer status: 1=verified, -1=fake, 0=neutral/unverified
+                status = 0
+                if result.get("is_fake", False):
+                    status = -1
+                elif result.get("is_verified", False):
+                    status = 1
+                    
                 return {
                     "success": True,
-                    "is_verified": result.get("is_verified", False),
+                    "is_verified": status, # Returns 1, 0, or -1
                     "confidence_score": result.get("confidence_score", 0),
                     "analysis": result.get("analysis", ""),
                     "severity_estimate": result.get("severity_estimate", "unknown")

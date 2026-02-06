@@ -490,14 +490,16 @@ def upload_attachment(incident_id):
                             SET is_verified = ?, verification_score = ?, ai_analysis = ?, updated_at = CURRENT_TIMESTAMP
                             WHERE id = ?
                         ''', (
-                            1 if result['is_verified'] else 0,
+                            result['is_verified'], # Now an integer: 1, 0, or -1
                             result['confidence_score'],
                             result['analysis'],
                             inc_id
                         ))
                         
                         # Add timeline event
-                        verification_status = "VERIFIED" if result['is_verified'] else "UNVERIFIED"
+                        status_map = {1: "VERIFIED", 0: "UNVERIFIED", -1: "FAKE/FRAUD"}
+                        verification_status = status_map.get(result['is_verified'], "UNKNOWN")
+                        
                         cursor.execute('''
                             INSERT INTO incident_timeline (incident_id, event_type, description, user_name, metadata)
                             VALUES (?, ?, ?, ?, ?)

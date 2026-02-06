@@ -165,12 +165,20 @@ export default function IncidentsView() {
                                         )}
                                     </div>
                                     <h3 className="font-semibold text-base">{incident.type}</h3>
-                                    {incident.verified && (
+                                    {incident.verified === 1 && (
                                         <div className="mt-1 flex items-center gap-1.5 w-fit bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
                                             <div className="bg-blue-500 rounded-full p-0.5">
                                                 <CheckCircle2 className="w-2.5 h-2.5 text-white" />
                                             </div>
                                             <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase">AI Verified</span>
+                                        </div>
+                                    )}
+                                    {incident.verified === -1 && (
+                                        <div className="mt-1 flex items-center gap-1.5 w-fit bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">
+                                            <div className="bg-red-500 rounded-full p-0.5">
+                                                <AlertTriangle className="w-2.5 h-2.5 text-white" />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-red-600 dark:text-red-400 tracking-wide uppercase">Potential Fake</span>
                                         </div>
                                     )}
                                 </div>

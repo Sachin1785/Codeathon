@@ -52,7 +52,7 @@ def init_db():
             victims_count INTEGER DEFAULT 0,
             report_count INTEGER DEFAULT 1,
             sosmesh_messages TEXT,
-            is_verified BOOLEAN DEFAULT 0,
+            is_verified INTEGER DEFAULT 0,
             verification_score INTEGER DEFAULT 0,
             ai_analysis TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -245,11 +245,6 @@ def seed_sample_data():
     print("   Users: user1-3 / password123")
     print("   Responders: responder1-5 / password123")
 
-def get_db_connection():
-    """Get a connection to the database"""
-    conn = sqlite3.connect(Config.DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 if __name__ == '__main__':
     init_db()
