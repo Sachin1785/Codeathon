@@ -477,7 +477,7 @@ export default function CrisisCommandDashboard() {
               <span className="text-[10px]">Resources</span>
             </div>
           </button>
-          <button
+          {/* <button
             onClick={() => setRightSidebarView('evidence')}
             className={`flex-1 px-2 py-3 font-medium transition-colors ${rightSidebarView === 'evidence'
               ? 'bg-primary/10 text-primary border-b-2 border-primary'
@@ -488,7 +488,7 @@ export default function CrisisCommandDashboard() {
               <ImageIcon className="w-4 h-4" />
               <span className="text-[10px]">Evidence</span>
             </div>
-          </button>
+          </button> */}
         </div>
 
         {/* Tab Content */}
